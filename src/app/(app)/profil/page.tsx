@@ -1,0 +1,344 @@
+'use client';
+
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import {
+  User,
+  Camera,
+  Save,
+  MapPin,
+  Plus,
+  X,
+  Target,
+  Briefcase,
+  GraduationCap,
+  Globe,
+} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Badge } from '@/components/ui/Badge';
+import { api } from '@/lib/axios';
+import { useAuthStore } from '@/stores/authStore';
+import { staggerContainer, fadeInUp } from '@/lib/animations';
+import toast from 'react-hot-toast';
+
+const schema = z.object({
+  name: z.string().min(2, 'Nom requis'),
+  email: z.string().email('Email invalide'),
+  phone: z.string().optional(),
+  city: z.string().optional(),
+  title: z.string().optional(),
+  bio: z.string().max(500).optional(),
+  linkedin: z.string().url('URL invalide').optional().or(z.literal('')),
+  github: z.string().url('URL invalide').optional().or(z.literal('')),
+  portfolio: z.string().url('URL invalide').optional().or(z.literal('')),
+  targetSalaryMin: z.coerce.number().optional(),
+  targetSalaryMax: z.coerce.number().optional(),
+  targetContracts: z.array(z.string()).optional(),
+  targetLocations: z.array(z.string()).optional(),
+  targetSectors: z.array(z.string()).optional(),
+  skills: z.array(z.string()).optional(),
+  openToRemote: z.boolean().optional(),
+});
+type FormData = z.infer<typeof schema>;
+
+const CONTRACT_OPTIONS = ['CDI', 'CDD', 'Stage', 'Alternance', 'Freelance', 'Mission'];
+const SECTOR_OPTIONS = ['Tech', 'Design', 'Marketing', 'Finance', 'Santé', 'Retail', 'RH', 'Commercial', 'Logistique'];
+
+function TagInput({
+  values,
+  onChange,
+  placeholder,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  placeholder?: string;
+}) {
+  const [input, setInput] = useState('');
+  const add = () => {
+    const v = input.trim();
+    if (v && !values.includes(v)) onChange([...values, v]);
+    setInput('');
+  };
+  return (
+    <div className="flex flex-wrap gap-1.5 p-2 min-h-[44px] border border-[#E2E8F0] rounded-btn bg-white focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
+      {values.map((v) => (
+        <span key={v} className="flex items-center gap-1 bg-accent/10 text-accent text-xs font-semibold px-2 py-0.5 rounded-full">
+          {v}
+          <button type="button" onClick={() => onChange(values.filter((x) => x !== v))}>
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      <input
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())}
+        placeholder={placeholder}
+        className="flex-1 min-w-[120px] text-sm outline-none bg-transparent placeholder:text-[#94A3B8]"
+      />
+    </div>
+  );
+}
+
+export default function ProfilPage() {
+  const { user, updateUser } = useAuthStore();
+  const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'info' | 'preferences' | 'competences'>('info');
+
+  const { data: profile } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get('/users/me').then((r) => r.data),
+    placeholderData: user,
+  });
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    formState: { errors, isDirty },
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      name: profile?.name ?? '',
+      email: profile?.email ?? '',
+      phone: profile?.phone ?? '',
+      city: profile?.city ?? '',
+      title: profile?.title ?? '',
+      bio: profile?.bio ?? '',
+      linkedin: profile?.linkedin ?? '',
+      github: profile?.github ?? '',
+      portfolio: profile?.portfolio ?? '',
+      targetSalaryMin: profile?.targetSalaryMin,
+      targetSalaryMax: profile?.targetSalaryMax,
+      targetContracts: profile?.targetContracts ?? [],
+      targetLocations: profile?.targetLocations ?? [],
+      targetSectors: profile?.targetSectors ?? [],
+      skills: profile?.skills ?? [],
+      openToRemote: profile?.openToRemote ?? false,
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (data: FormData) => api.patch('/users/me', data).then((r) => r.data),
+    onSuccess: (data) => {
+      updateUser(data);
+      qc.invalidateQueries({ queryKey: ['me'] });
+      toast.success('Profil mis à jour !');
+    },
+    onError: () => toast.error('Erreur lors de la sauvegarde'),
+  });
+
+  const targetContracts = watch('targetContracts') ?? [];
+  const targetSectors = watch('targetSectors') ?? [];
+
+  const TABS = [
+    { id: 'info', label: 'Informations', icon: User },
+    { id: 'preferences', label: 'Préférences', icon: Target },
+    { id: 'competences', label: 'Compétences', icon: GraduationCap },
+  ] as const;
+
+  return (
+    <motion.div initial="initial" animate="animate" variants={staggerContainer} className="space-y-6 max-w-[860px]">
+      {/* Header */}
+      <motion.div variants={fadeInUp} className="flex items-start gap-4">
+        {/* Avatar */}
+        <div className="relative">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-2xl font-extrabold font-heading shrink-0 uppercase">
+            {(user?.name ?? 'U').slice(0, 1)}
+          </div>
+          <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full border border-[#E2E8F0] flex items-center justify-center hover:bg-accent hover:text-white hover:border-transparent transition-colors shadow-sm">
+            <Camera size={11} />
+          </button>
+        </div>
+        <div>
+          <h2 className="font-heading text-2xl font-bold text-[#1E293B]">{user?.name ?? 'Mon profil'}</h2>
+          <p className="text-sm text-[#64748B] mt-0.5">{user?.email}</p>
+          {user?.plan && (
+            <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+              user.plan === 'FREE' ? 'bg-gray-100 text-gray-600' : user.plan === 'PRO' ? 'bg-accent/10 text-accent' : 'bg-amber-50 text-amber-600'
+            }`}>
+              {user.plan}
+            </span>
+          )}
+        </div>
+        <div className="ml-auto">
+          <Button onClick={handleSubmit((d) => saveMutation.mutate(d))} loading={saveMutation.isPending} disabled={!isDirty}>
+            <Save size={15} />
+            Enregistrer
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* Tabs */}
+      <motion.div variants={fadeInUp} className="flex gap-1 bg-[#F7F8FC] p-1 rounded-xl w-fit">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === t.id ? 'bg-white text-accent shadow-sm' : 'text-[#64748B] hover:text-[#1E293B]'
+            }`}
+          >
+            <t.icon size={14} />
+            {t.label}
+          </button>
+        ))}
+      </motion.div>
+
+      <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))}>
+        {/* INFO TAB */}
+        {activeTab === 'info' && (
+          <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-6 space-y-5" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+            <h3 className="font-heading font-semibold text-[#1E293B] text-base border-b border-[#E2E8F0] pb-3">Informations personnelles</h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Nom complet" {...register('name')} error={errors.name?.message} />
+              <Input label="Email" type="email" {...register('email')} error={errors.email?.message} />
+              <Input label="Téléphone" {...register('phone')} placeholder="+33 6 00 00 00 00" />
+              <Input label="Ville" {...register('city')} placeholder="Paris, France" leftIcon={<MapPin size={14} />} />
+              <Input label="Titre / Poste" {...register('title')} placeholder="ex: UX Designer Senior" className="col-span-2" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Bio courte</label>
+              <textarea
+                {...register('bio')}
+                rows={3}
+                placeholder="Décrivez-vous en quelques phrases…"
+                className="w-full p-3 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 resize-none"
+              />
+              <p className="text-xs text-[#94A3B8] mt-1">{(watch('bio') ?? '').length}/500 caractères</p>
+            </div>
+
+            <h3 className="font-heading font-semibold text-[#1E293B] text-base border-b border-[#E2E8F0] pb-3 pt-2">Liens professionnels</h3>
+            <div className="grid grid-cols-1 gap-3">
+              <Input label="LinkedIn" {...register('linkedin')} error={errors.linkedin?.message} placeholder="https://linkedin.com/in/votre-profil" leftIcon={<Globe size={14} />} />
+              <Input label="GitHub" {...register('github')} error={errors.github?.message} placeholder="https://github.com/votre-profil" />
+              <Input label="Portfolio" {...register('portfolio')} error={errors.portfolio?.message} placeholder="https://votre-portfolio.com" />
+            </div>
+          </motion.div>
+        )}
+
+        {/* PREFERENCES TAB */}
+        {activeTab === 'preferences' && (
+          <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-6 space-y-5" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+            <h3 className="font-heading font-semibold text-[#1E293B] text-base border-b border-[#E2E8F0] pb-3">Préférences de recherche</h3>
+
+            {/* Salary */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Salaire cible (€/an)</p>
+              <div className="flex items-center gap-3">
+                <Input label="Minimum" type="number" {...register('targetSalaryMin')} placeholder="40 000" />
+                <span className="mt-6 text-[#94A3B8]">—</span>
+                <Input label="Maximum" type="number" {...register('targetSalaryMax')} placeholder="60 000" />
+              </div>
+            </div>
+
+            {/* Remote */}
+            <div className="flex items-center gap-3">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" {...register('openToRemote')} className="sr-only peer" />
+                <div className="w-10 h-5 bg-[#E2E8F0] peer-focus:outline-none rounded-full peer peer-checked:bg-accent transition-all after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
+              </label>
+              <span className="text-sm font-medium text-[#1E293B]">Ouvert au télétravail</span>
+            </div>
+
+            {/* Contract types */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Types de contrat souhaités</p>
+              <div className="flex flex-wrap gap-2">
+                {CONTRACT_OPTIONS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      const curr = targetContracts;
+                      setValue('targetContracts', curr.includes(c) ? curr.filter((x) => x !== c) : [...curr, c], { shouldDirty: true });
+                    }}
+                    className={`px-3 py-1.5 rounded-btn text-xs font-semibold border transition-all ${
+                      targetContracts.includes(c) ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-[#F7F8FC] border-[#E2E8F0] text-[#64748B] hover:border-accent/30'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sectors */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Secteurs d&apos;activité visés</p>
+              <div className="flex flex-wrap gap-2">
+                {SECTOR_OPTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      const curr = targetSectors;
+                      setValue('targetSectors', curr.includes(s) ? curr.filter((x) => x !== s) : [...curr, s], { shouldDirty: true });
+                    }}
+                    className={`px-3 py-1.5 rounded-btn text-xs font-semibold border transition-all ${
+                      targetSectors.includes(s) ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-[#F7F8FC] border-[#E2E8F0] text-[#64748B] hover:border-primary/30'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Locations */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Localisations souhaitées</p>
+              <Controller
+                name="targetLocations"
+                control={control}
+                render={({ field }) => (
+                  <TagInput values={field.value ?? []} onChange={field.onChange} placeholder="Appuyez sur Entrée pour ajouter…" />
+                )}
+              />
+            </div>
+          </motion.div>
+        )}
+
+        {/* COMPETENCES TAB */}
+        {activeTab === 'competences' && (
+          <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-6 space-y-5" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+            <h3 className="font-heading font-semibold text-[#1E293B] text-base border-b border-[#E2E8F0] pb-3">Compétences</h3>
+            <p className="text-sm text-[#64748B]">Renseignez vos compétences clés — elles seront utilisées pour le matching IA des offres.</p>
+            <Controller
+              name="skills"
+              control={control}
+              render={({ field }) => (
+                <TagInput values={field.value ?? []} onChange={field.onChange} placeholder="ex: React, Figma, Management (Entrée pour valider)…" />
+              )}
+            />
+            <div className="flex flex-wrap gap-2 pt-2">
+              {['React', 'TypeScript', 'Node.js', 'Figma', 'UX Design', 'Agile', 'SQL', 'Python'].map((s) => {
+                const skills = watch('skills') ?? [];
+                if (skills.includes(s)) return null;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setValue('skills', [...skills, s], { shouldDirty: true })}
+                    className="flex items-center gap-1 text-xs text-[#64748B] border border-dashed border-[#CBD5E1] px-2.5 py-1 rounded-full hover:border-accent/40 hover:text-accent transition-colors"
+                  >
+                    <Plus size={10} />{s}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </form>
+    </motion.div>
+  );
+}
