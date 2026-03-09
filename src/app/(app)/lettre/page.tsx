@@ -373,7 +373,7 @@ export default function LettresPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Poste vis\u00e9"
+              label="Poste visé"
               placeholder="ex: Lead UX Designer"
               value={importJobTitle}
               onChange={(e) => setImportJobTitle(e.target.value)}
