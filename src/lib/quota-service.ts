@@ -65,7 +65,12 @@ async function getOrCreateUsage(userId: string) {
       update: {},
     });
   } catch (err) {
-    if (isDbError(err)) return fallbackUsage();
+    if (isDbError(err)) {
+      // In production: throw so the route-level .catch() can return { allowed: true }
+      // In local dev: return fallback (0) so dev works without a running DB
+      if (process.env.NODE_ENV === 'production') throw err;
+      return fallbackUsage();
+    }
     throw err;
   }
 }

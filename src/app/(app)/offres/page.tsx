@@ -47,6 +47,7 @@ function OffresPageContent() {
   const autoApplyLimit = planConfig.dailyLimits.auto_apply;
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
+  const [debouncedQuery, setDebouncedQuery] = useState(searchParams.get('q') ?? '');
   const [contract, setContract] = useState('Tous');
   const [sector, setSector] = useState('Tous');
   const [distance, setDistance] = useState<number>(0);
@@ -57,6 +58,13 @@ function OffresPageContent() {
     const q = searchParams.get('q');
     if (q) { setQuery(q); setTab('all'); }
   }, [searchParams]);
+
+  // Debounce search — avoid flooding the API on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 400);
+    return () => clearTimeout(t);
+  }, [query]);
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // F1 — saved offer IDs (local state, backed by /offers/[id]/save)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -82,13 +90,13 @@ function OffresPageContent() {
     }
   };
 
-  const { data: offers = [], isLoading } = useQuery<JobOffer[]>({
-    queryKey: ['offers', tab, query, contract, sector, distance],
+  const { data: offers = [], isLoading, isError: offersIsError } = useQuery<JobOffer[]>({
+    queryKey: ['offers', tab, debouncedQuery, contract, sector, distance],
     queryFn: () =>
       api
         .get(tab === 'recommended' ? '/offers/recommended' : '/offers', {
           params: {
-            q: query,
+            q: debouncedQuery,
             contract: contract !== 'Tous' ? contract : undefined,
             sector: sector !== 'Tous' ? sector : undefined,
             distance: distance > 0 ? distance : undefined,
@@ -96,7 +104,12 @@ function OffresPageContent() {
         })
         .then((r) => r.data),
     placeholderData: keepPreviousData,
+    retry: false,
   });
+
+  useEffect(() => {
+    if (offersIsError) toast.error('Erreur lors de la recherche d\'offres. Réessayez dans un instant.');
+  }, [offersIsError]);
 
   // F6 — application stats for the mini stats bar
   const { data: appStats } = useQuery<{ totalApplications: number; responseRate: number; interviewsCount: number; pendingCount: number }>({
