@@ -66,8 +66,17 @@ function OffresPageContent() {
   }, [query]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  // F1 — saved offer IDs (local state, backed by /offers/[id]/save)
+  // F1 — saved offer IDs loaded from DB
+  const { data: savedOfferIds = [] } = useQuery<string[]>({
+    queryKey: ['savedOffers'],
+    queryFn: () => api.get('/offers/saved').then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  // Sync savedIds from DB query on mount
+  useEffect(() => {
+    if (savedOfferIds.length > 0) setSavedIds(new Set(savedOfferIds));
+  }, [savedOfferIds]);
   // F3 — alert creation panel
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertKeywords, setAlertKeywords] = useState('');
@@ -119,15 +128,25 @@ function OffresPageContent() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: ({ id, saved }: { id: string; saved: boolean }) =>
-      saved ? api.delete(`/offers/${id}/save`) : api.post(`/offers/${id}/save`),
+    mutationFn: ({ id, saved, offer }: { id: string; saved: boolean; offer: JobOffer }) =>
+      saved
+        ? api.delete(`/offers/${id}/save`)
+        : api.post(`/offers/${id}/save`, {
+            title: offer.title,
+            company: offer.company,
+            location: offer.location,
+            contractType: offer.contractType,
+            salary: offer.salary,
+            url: offer.url,
+            description: offer.description,
+          }),
     onSuccess: (_, vars) => {
       setSavedIds((prev) => {
         const next = new Set(prev);
         if (vars.saved) next.delete(vars.id); else next.add(vars.id);
         return next;
       });
-      qc.invalidateQueries({ queryKey: ['offers'] });
+      qc.invalidateQueries({ queryKey: ['savedOffers'] });
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erreur';
@@ -403,6 +422,9 @@ function OffresPageContent() {
         {/* Distance filter */}
         <div className="flex items-center gap-2">
           <MapPin size={14} className="text-[#94A3B8] shrink-0" />
+          {distance > 0 && user?.location && (
+            <span className="text-xs text-[#64748B] font-medium">{user.location.split(',')[0]}</span>
+          )}
           <select
             value={distance}
             onChange={(e) => setDistance(Number(e.target.value))}
@@ -566,7 +588,7 @@ function OffresPageContent() {
               </Button>
               <button
                 className="ml-auto p-1.5 rounded-lg text-[#94A3B8] hover:text-accent hover:bg-accent/10 transition-colors"
-                onClick={() => saveMutation.mutate({ id: offer.id, saved: savedIds.has(offer.id) })}
+                onClick={() => saveMutation.mutate({ id: offer.id, saved: savedIds.has(offer.id), offer })}
                 title={savedIds.has(offer.id) ? 'Retirer des favoris' : 'Sauvegarder'}
               >
                 {savedIds.has(offer.id) ? (

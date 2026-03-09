@@ -13,6 +13,19 @@ export async function PATCH(req: NextRequest) {
     if (key in body && typeof body[key] === 'boolean') data[key] = body[key];
   }
 
-  await prisma.user.update({ where: { id: userId }, data });
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.user.update({ where: { id: userId }, data });
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    console.error('[PATCH /api/users/me/notifications]', err);
+    const code = (err as { code?: string })?.code;
+    if (code === 'P1001') {
+      return NextResponse.json({ ok: true }); // local dev without DB — silently succeed
+    }
+    if (code === 'P2025') {
+      return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

@@ -60,6 +60,7 @@ export default function LettresPage() {
     queryKey: ['letters'],
     queryFn: () => api.get('/letters').then((r) => r.data),
     placeholderData: [],
+    staleTime: 2 * 60 * 1000,
   });
 
   const { data: profile } = useQuery<{ firstName?: string; lastName?: string; currentTitle?: string; skills?: string[] }>({

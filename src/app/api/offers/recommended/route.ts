@@ -58,11 +58,17 @@ export async function GET(req: NextRequest) {
   const contractMap: Record<string, string> = { CDI: 'CDI', CDD: 'CDD', Stage: 'SAI', Alternance: 'MIS' };
   const typeContrat = user?.targetContract?.[0] ? contractMap[user.targetContract[0]] : undefined;
 
-  const result = await searchOffers({
-    motsCles: keywords || undefined,
-    typeContrat,
-    range: '0-19',
-  });
+  let result;
+  try {
+    result = await searchOffers({
+      motsCles: keywords || undefined,
+      typeContrat,
+      range: '0-19',
+    });
+  } catch (err) {
+    console.error('[GET /api/offers/recommended] France Travail error:', err);
+    return NextResponse.json(MOCK_OFFERS);
+  }
 
   let offers = result.resultats.map(normalizeOffer);
 

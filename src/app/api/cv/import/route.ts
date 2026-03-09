@@ -43,6 +43,26 @@ async function extractText(file: File): Promise<string> {
   throw new Error('Format non supporté. Utilisez .txt, .pdf ou .docx');
 }
 
+function computeAtsScore(content: Record<string, unknown>): number {
+  let score = 0;
+  const personal = content.personal as Record<string, string> | undefined;
+  if (personal) {
+    const keyFields = ['firstName', 'lastName', 'title', 'email', 'phone', 'city'];
+    score += keyFields.filter((k) => personal[k]?.trim()).length * 3; // up to 18
+  }
+  const summary = content.summary as string | undefined;
+  if (summary && summary.trim().length > 50) score += 12;
+  const experiences = content.experiences as unknown[] | undefined;
+  score += Math.min((experiences?.length ?? 0) * 10, 30);
+  const education = content.education as unknown[] | undefined;
+  score += Math.min((education?.length ?? 0) * 8, 16);
+  const skills = content.skills as unknown[] | undefined;
+  score += Math.min((skills?.length ?? 0) * 2, 14);
+  const languages = content.languages as unknown[] | undefined;
+  score += Math.min((languages?.length ?? 0) * 5, 10);
+  return Math.min(score, 100);
+}
+
 const CV_PROMPT = (text: string) => `Tu es un parseur de CV expert. Extrais les informations structurées du texte de CV suivant et retourne un JSON valide correspondant exactement à cette structure TypeScript :
 
 {
@@ -152,18 +172,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ...cv, truncated: false, truncatedAt: null }, { status: 201 });
     } catch (err: unknown) {
       if (isDbConnectionError(err)) {
-        return NextResponse.json({
-          id: `cv-import-${Date.now()}`,
-          userId,
-          name: name.slice(0, 100),
-          template: 'modern',
-          isDefault: false,
-          content: originalContent,
-          truncated: false,
-          truncatedAt: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }, { status: 201 });
+        return NextResponse.json({ error: 'Base de données inaccessible. Réessayez dans quelques instants.' }, { status: 503 });
       }
       const message = err instanceof Error ? err.message : 'Erreur serveur';
       return NextResponse.json({ error: message }, { status: 500 });
@@ -203,23 +212,12 @@ export async function POST(req: NextRequest) {
         name: name.slice(0, 100),
         template: 'modern',
         content: content as object,
+        atsScore: computeAtsScore(content),
       },
     });
   } catch (err: unknown) {
     if (isDbConnectionError(err)) {
-      await incrementUsage(userId, 'cv_generation').catch(() => {});
-      return NextResponse.json({
-        id: `cv-import-${Date.now()}`,
-        userId,
-        name: name.slice(0, 100),
-        template: 'modern',
-        isDefault: false,
-        content,
-        truncated,
-        truncatedAt: truncated ? MAX_CHARS : null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }, { status: 201 });
+      return NextResponse.json({ error: 'Base de données inaccessible. Réessayez dans quelques instants.' }, { status: 503 });
     }
     console.error('[POST /api/cv/import] prisma.create', err);
     const message = err instanceof Error ? err.message : 'Erreur serveur';

@@ -56,11 +56,9 @@ export default function ParametresPage() {
   const [customReason, setCustomReason] = useState('');
 
   const [notifications, setNotifications] = useState({
-    emailNewOffer: user?.notifEmailNewOffer ?? true,
-    emailApplicationStatus: user?.notifEmailApplicationStatus ?? true,
-    emailWeeklyDigest: user?.notifEmailWeeklyDigest ?? false,
-    pushNewOffer: false,
-    pushApplicationStatus: true,
+    notifEmailNewOffer: user?.notifEmailNewOffer ?? true,
+    notifEmailApplicationStatus: user?.notifEmailApplicationStatus ?? true,
+    notifEmailWeeklyDigest: user?.notifEmailWeeklyDigest ?? false,
   });
 
   const {
@@ -199,11 +197,9 @@ export default function ParametresPage() {
         </div>
         <div className="p-6 space-y-4">
           {[
-            { key: 'emailNewOffer', label: 'Nouvelles offres matchées', sublabel: 'Email' },
-            { key: 'emailApplicationStatus', label: 'Mise à jour candidatures', sublabel: 'Email' },
-            { key: 'emailWeeklyDigest', label: 'Résumé hebdomadaire', sublabel: 'Email' },
-            { key: 'pushNewOffer', label: 'Nouvelles offres', sublabel: 'Push' },
-            { key: 'pushApplicationStatus', label: 'Mise à jour candidatures', sublabel: 'Push' },
+            { key: 'notifEmailNewOffer', label: 'Nouvelles offres matchées', sublabel: 'Email' },
+            { key: 'notifEmailApplicationStatus', label: 'Mise à jour candidatures', sublabel: 'Email' },
+            { key: 'notifEmailWeeklyDigest', label: 'Résumé hebdomadaire', sublabel: 'Email' },
           ].map(({ key, label, sublabel }) => (
             <div key={key} className="flex items-center justify-between py-1">
               <div>
@@ -259,7 +255,7 @@ export default function ParametresPage() {
           <div>
             <p className="text-sm font-medium text-[#1E293B] mb-2">Thème</p>
             <div className="flex gap-2">
-              {(['light', 'system', 'dark'] as const).map((t) => (
+              {(['light', 'dark'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTheme(t)}
@@ -269,8 +265,8 @@ export default function ParametresPage() {
                       : 'border-[#E2E8F0] text-[#64748B] hover:border-accent'
                   }`}
                 >
-                  {t === 'light' ? <Sun size={14} /> : t === 'dark' ? <Moon size={14} /> : <Globe size={14} />}
-                  {t === 'light' ? 'Clair' : t === 'dark' ? 'Sombre' : 'Système'}
+                  {t === 'light' ? <Sun size={14} /> : <Moon size={14} />}
+                  {t === 'light' ? 'Clair' : 'Sombre'}
                 </button>
               ))}
             </div>

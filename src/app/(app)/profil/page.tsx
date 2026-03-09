@@ -161,7 +161,11 @@ export default function ProfilPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data: FormData) => api.patch('/users/me', data).then((r) => r.data),
+    mutationFn: (data: FormData) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { email: _email, ...payload } = data;
+      return api.patch('/users/me', payload).then((r) => r.data);
+    },
     onSuccess: (data) => {
       updateUser(data);
       qc.invalidateQueries({ queryKey: ['me'] });
