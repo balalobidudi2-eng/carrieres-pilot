@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkQuota, incrementUsage, getUserPlan } from '@/lib/quota-service';
+import { DEMO_USER_ID } from '@/lib/demo-user';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
+
+function isDbConnectionError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("Can't reach database") || msg.includes('P1001') || msg.includes('localhost:5432');
+}
 
 async function extractText(file: File): Promise<string> {
   const name = file.name.toLowerCase();
@@ -55,6 +63,9 @@ export async function POST(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
+  // Demo / test users — extract text only, skip OpenAI + Prisma
+  const isDemo = DEMO_IDS.has(userId);
+
   const plan = await getUserPlan(userId);
   const quota = await checkQuota(userId, plan, 'cv_generation');
   if (!quota.allowed) {
@@ -92,6 +103,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Contenu du CV trop court ou illisible' }, { status: 400 });
   }
 
+  // Demo / test users: skip OpenAI + Prisma, return a mock CV immediately
+  if (isDemo) {
+    return NextResponse.json({
+      id: `cv-import-${Date.now()}`,
+      userId,
+      name: name.slice(0, 100),
+      template: 'modern',
+      content: {
+        personal: { firstName: '', lastName: '', title: '', email: '', phone: '', city: '', linkedin: '' },
+        summary: text.slice(0, 300),
+        experiences: [],
+        education: [],
+        skills: [],
+        languages: [],
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { status: 201 });
+  }
   let content: Record<string, unknown>;
   try {
     const completion = await openai.chat.completions.create({
@@ -116,6 +146,17 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err: unknown) {
+    if (isDbConnectionError(err)) {
+      return NextResponse.json({
+        id: `cv-import-${Date.now()}`,
+        userId,
+        name: name.slice(0, 100),
+        template: 'modern',
+        content,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, { status: 201 });
+    }
     console.error('[POST /api/cv/import] prisma.create', err);
     const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });

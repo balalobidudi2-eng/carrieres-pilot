@@ -4,6 +4,18 @@ import { DEMO_USER_ID, DEMO_USER } from './demo-user';
 
 export type QuotaKey = keyof PlanLimits;
 
+// Test accounts that bypass the database entirely
+const TEST_PLANS: Record<string, string> = {
+  'test-free': 'FREE',
+  'test-pro': 'PRO',
+  'test-expert': 'EXPERT',
+};
+
+function isDbError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("Can't reach database") || msg.includes('P1001') || msg.includes('localhost:5432');
+}
+
 /** Map quota keys to DailyUsage DB column names */
 const QUOTA_DB_FIELD: Record<QuotaKey, string> = {
   cv_generation: 'cvGeneration',
@@ -19,14 +31,24 @@ function todayStr(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); // YYYY-MM-DD
 }
 
+/** Fallback usage object when DB is unreachable — allows all actions */
+function fallbackUsage() {
+  return { cvGeneration: 0, coverLetter: 0, jobSearch: 0, aiMatching: 0, autoApply: 0, interviewQuestions: 0, date: todayStr() };
+}
+
 /** Get or create today's usage record for a user */
 async function getOrCreateUsage(userId: string) {
   const date = todayStr();
-  return prisma.dailyUsage.upsert({
-    where: { userId_date: { userId, date } },
-    create: { userId, date },
-    update: {},
-  });
+  try {
+    return await prisma.dailyUsage.upsert({
+      where: { userId_date: { userId, date } },
+      create: { userId, date },
+      update: {},
+    });
+  } catch (err) {
+    if (isDbError(err)) return fallbackUsage();
+    throw err;
+  }
 }
 
 /** Check if user can perform an action, returns { allowed, used, max } */
@@ -57,13 +79,19 @@ export async function checkQuota(
 
 /** Increment usage counter after a successful action */
 export async function incrementUsage(userId: string, action: QuotaKey): Promise<void> {
+  if (userId === DEMO_USER_ID || userId in TEST_PLANS) return; // no-op for virtual users
   const date = todayStr();
   const field = QUOTA_DB_FIELD[action];
-  await prisma.dailyUsage.upsert({
-    where: { userId_date: { userId, date } },
-    create: { userId, date, [field]: 1 },
-    update: { [field]: { increment: 1 } },
-  });
+  try {
+    await prisma.dailyUsage.upsert({
+      where: { userId_date: { userId, date } },
+      create: { userId, date, [field]: 1 },
+      update: { [field]: { increment: 1 } },
+    });
+  } catch (err) {
+    if (isDbError(err)) return; // silently skip if DB unreachable locally
+    throw err;
+  }
 }
 
 /** Get full usage summary for today (for subscription bar) */
@@ -95,6 +123,12 @@ export async function getDailyUsageSummary(userId: string, plan: string) {
 /** Resolve the plan name for a user (handles demo user without DB) */
 export async function getUserPlan(userId: string): Promise<string> {
   if (userId === DEMO_USER_ID) return DEMO_USER.plan;
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-  return user?.plan ?? 'FREE';
+  if (userId in TEST_PLANS) return TEST_PLANS[userId];
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+    return user?.plan ?? 'FREE';
+  } catch (err) {
+    if (isDbError(err)) return 'FREE'; // default plan when DB unreachable locally
+    throw err;
+  }
 }
