@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useForm, Controller } from 'react-hook-form';
@@ -17,7 +17,12 @@ import {
   Briefcase,
   GraduationCap,
   Globe,
+  FileText,
+  Upload,
+  ArrowRight,
+  Mail,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
@@ -86,11 +91,44 @@ export default function ProfilPage() {
   const { user, updateUser } = useAuthStore();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<'info' | 'preferences' | 'competences'>('info');
+  const letterFileRef = useRef<HTMLInputElement>(null);
 
   const { data: profile } = useQuery({
     queryKey: ['me'],
     queryFn: () => api.get('/users/me').then((r) => r.data),
     placeholderData: user,
+  });
+
+  const { data: cvs = [], isLoading: cvLoading } = useQuery<{ id: string; name: string; atsScore?: number | null; updatedAt: string }[]>({
+    queryKey: ['cvs'],
+    queryFn: () => api.get('/cv').then((r) => r.data),
+    placeholderData: [],
+  });
+
+  const { data: letters = [], isLoading: letterLoading } = useQuery<{ id: string; name: string; tone?: string | null; companyName?: string | null; updatedAt: string }[]>({
+    queryKey: ['letters'],
+    queryFn: () => api.get('/letters').then((r) => r.data),
+    placeholderData: [],
+  });
+
+  const importLetterMutation = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('jobTitle', 'Importée');
+      form.append('company', '');
+      return api.post('/letters/import', form).then((r) => r.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['letters'] });
+      toast.success('Lettre importée avec succès !');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : null)
+        ?? 'Erreur lors de l\'import';
+      toast.error(msg);
+    },
   });
 
   const {
@@ -324,6 +362,98 @@ export default function ProfilPage() {
           </motion.div>
         )}
       </form>
+
+      {/* ── Documents actifs ── */}
+      <motion.div variants={fadeInUp} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* CV actif */}
+        <div className="bg-white rounded-card border border-[#E2E8F0] p-5 space-y-3" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+              <FileText size={15} className="text-primary" />
+            </div>
+            <h3 className="font-heading font-semibold text-[#1E293B] text-sm">CV actif</h3>
+          </div>
+
+          {cvLoading ? (
+            <div className="h-10 bg-gray-100 animate-pulse rounded" />
+          ) : cvs.length === 0 ? (
+            <p className="text-sm text-[#94A3B8]">Aucun CV créé pour le moment</p>
+          ) : (
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] truncate">{cvs[0].name}</p>
+              {cvs[0].atsScore != null && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <div className="flex-1 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
+                    <div className="h-full bg-accent rounded-full" style={{ width: `${cvs[0].atsScore}%` }} />
+                  </div>
+                  <span className="text-xs font-semibold text-accent">{cvs[0].atsScore}%</span>
+                  <span className="text-xs text-[#94A3B8]">ATS</span>
+                </div>
+              )}
+              <p className="text-xs text-[#94A3B8] mt-1">
+                Modifié le {new Date(cvs[0].updatedAt).toLocaleDateString('fr-FR')}
+              </p>
+            </div>
+          )}
+
+          <Link href="/cv" className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline">
+            Gérer mes CV <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        {/* Lettre active */}
+        <div className="bg-white rounded-card border border-[#E2E8F0] p-5 space-y-3" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
+              <Mail size={15} className="text-accent" />
+            </div>
+            <h3 className="font-heading font-semibold text-[#1E293B] text-sm">Lettre de motivation active</h3>
+          </div>
+
+          {letterLoading ? (
+            <div className="h-10 bg-gray-100 animate-pulse rounded" />
+          ) : letters.length === 0 ? (
+            <p className="text-sm text-[#94A3B8]">Aucune lettre créée pour le moment</p>
+          ) : (
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] truncate">{letters[0].name}</p>
+              <div className="flex items-center gap-2 mt-1">
+                {letters[0].tone && <Badge variant="neutral" size="sm">{letters[0].tone}</Badge>}
+                {letters[0].companyName && <span className="text-xs text-[#94A3B8]">{letters[0].companyName}</span>}
+              </div>
+              <p className="text-xs text-[#94A3B8] mt-1">
+                Modifiée le {new Date(letters[0].updatedAt).toLocaleDateString('fr-FR')}
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center gap-4">
+            <Link href="/lettre" className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline">
+              Gérer mes lettres <ArrowRight size={13} />
+            </Link>
+            <button
+              type="button"
+              onClick={() => letterFileRef.current?.click()}
+              disabled={importLetterMutation.isPending}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#64748B] hover:text-accent transition-colors disabled:opacity-50"
+            >
+              <Upload size={13} />
+              {importLetterMutation.isPending ? 'Import…' : 'Importer'}
+            </button>
+            <input
+              type="file"
+              ref={letterFileRef}
+              className="hidden"
+              accept=".pdf,.docx,.txt"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) importLetterMutation.mutate(file);
+                e.target.value = '';
+              }}
+            />
+          </div>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }

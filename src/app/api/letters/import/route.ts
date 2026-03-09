@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { DEMO_USER_ID } from '@/lib/demo-user';
+
+const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
 
 async function extractText(file: File): Promise<string> {
   const name = file.name.toLowerCase();
@@ -11,8 +14,12 @@ async function extractText(file: File): Promise<string> {
   if (name.endsWith('.pdf')) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
-    const data = await pdfParse(buffer);
-    return data.text;
+    try {
+      const data = await pdfParse(buffer);
+      return data.text;
+    } catch {
+      throw new Error('Ce PDF semble corrompu ou protégé. Essayez de l\'exporter à nouveau ou utilisez le format .txt / .docx');
+    }
   }
 
   if (name.endsWith('.doc') || name.endsWith('.docx')) {
@@ -57,6 +64,22 @@ export async function POST(req: NextRequest) {
 
   if (!content || content.trim().length < 10) {
     return NextResponse.json({ error: 'Contenu de la lettre trop court' }, { status: 400 });
+  }
+
+  // Demo / test users — skip DB
+  if (DEMO_IDS.has(userId)) {
+    const mock = {
+      id: `imported-${Date.now()}`,
+      userId,
+      name: `${jobTitle}${company ? ` — ${company}` : ''}`,
+      jobTitle,
+      companyName: company,
+      content: content.trim(),
+      tone: 'professional',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    return NextResponse.json(mock, { status: 201 });
   }
 
   try {

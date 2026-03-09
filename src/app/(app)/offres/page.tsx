@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -62,7 +62,7 @@ export default function OffresPage() {
           params: { q: query, contract: contract !== 'Tous' ? contract : undefined, sector: sector !== 'Tous' ? sector : undefined },
         })
         .then((r) => r.data),
-    placeholderData: [],
+    placeholderData: keepPreviousData,
   });
 
   const saveMutation = useMutation({

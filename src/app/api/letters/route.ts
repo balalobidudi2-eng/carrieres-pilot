@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(letters);
 }
 
+const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
+
 /** POST /api/letters — save a letter */
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -31,6 +33,22 @@ export async function POST(req: NextRequest) {
 
   let body: { name?: string; jobTitle?: string; company?: string; content?: string; tone?: string };
   try { body = await req.json(); } catch { body = {}; }
+
+  // Demo / test users — skip DB
+  if (DEMO_IDS.has(userId)) {
+    const mock = {
+      id: `letter-${Date.now()}`,
+      userId,
+      name: body.name ?? `${body.jobTitle ?? 'Poste'} — ${body.company ?? 'Entreprise'}`,
+      jobTitle: body.jobTitle ?? null,
+      companyName: body.company ?? null,
+      content: body.content ?? '',
+      tone: body.tone ?? 'professional',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    return NextResponse.json(mock, { status: 201 });
+  }
 
   try {
     const letter = await prisma.coverLetter.create({
