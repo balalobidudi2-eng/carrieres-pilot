@@ -8,6 +8,11 @@ export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
+  // Return demo user immediately without hitting DB
+  if (userId === DEMO_USER_ID) {
+    return NextResponse.json(DEMO_USER);
+  }
+
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -19,10 +24,6 @@ export async function GET(req: NextRequest) {
         onboardingDone: true, createdAt: true,
       },
     });
-    // Fallback to virtual demo user if not found in DB
-    if (!user && userId === DEMO_USER_ID) {
-      return NextResponse.json(DEMO_USER);
-    }
     if (!user) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
     return NextResponse.json(user);
   } catch (err: unknown) {

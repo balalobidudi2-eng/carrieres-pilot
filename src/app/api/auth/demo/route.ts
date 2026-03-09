@@ -7,29 +7,33 @@ import { prisma } from '@/lib/prisma';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-carrieres-pilot-fallback';
 
 export async function POST() {
-  // Ensure demo user exists in the database so Prisma FK constraints are satisfied
-  await prisma.user.upsert({
-    where: { id: DEMO_USER_ID },
-    create: {
-      id: DEMO_USER_ID,
-      email: DEMO_USER.email,
-      passwordHash: 'demo-no-password-hash',
-      firstName: DEMO_USER.firstName,
-      lastName: DEMO_USER.lastName,
-      currentTitle: DEMO_USER.currentTitle,
-      location: DEMO_USER.location,
-      bio: DEMO_USER.bio,
-      targetSalary: DEMO_USER.targetSalary,
-      targetContract: DEMO_USER.targetContract,
-      targetSectors: DEMO_USER.targetSectors,
-      targetLocations: DEMO_USER.targetLocations,
-      skills: DEMO_USER.skills,
-      plan: 'PRO',
-      emailVerified: true,
-      onboardingDone: true,
-    },
-    update: {},
-  });
+  // Try to persist demo user in DB (best-effort — not required for demo to work)
+  try {
+    await prisma.user.upsert({
+      where: { id: DEMO_USER_ID },
+      create: {
+        id: DEMO_USER_ID,
+        email: DEMO_USER.email,
+        passwordHash: 'demo-no-password-hash',
+        firstName: DEMO_USER.firstName,
+        lastName: DEMO_USER.lastName,
+        currentTitle: DEMO_USER.currentTitle,
+        location: DEMO_USER.location,
+        bio: DEMO_USER.bio,
+        targetSalary: DEMO_USER.targetSalary,
+        targetContract: DEMO_USER.targetContract,
+        targetSectors: DEMO_USER.targetSectors,
+        targetLocations: DEMO_USER.targetLocations,
+        skills: DEMO_USER.skills,
+        plan: 'PRO',
+        emailVerified: true,
+        onboardingDone: true,
+      },
+      update: {},
+    });
+  } catch {
+    // DB unavailable (no DATABASE_URL) — demo still works with JWT only
+  }
 
   const accessToken = jwt.sign({ sub: DEMO_USER_ID }, JWT_SECRET, { expiresIn: '24h' });
 
