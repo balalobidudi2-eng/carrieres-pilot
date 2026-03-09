@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get('q') ?? undefined;
   const contract = searchParams.get('contract') ?? undefined;
   const sector = searchParams.get('sector') ?? undefined;
+  const distance = searchParams.get('distance') ? Number(searchParams.get('distance')) : undefined;
 
   if (!process.env.FRANCE_TRAVAIL_CLIENT_ID) {
     return NextResponse.json({ error: 'France Travail API non configurée' }, { status: 503 });
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
     result = await searchOffers({
       motsCles: keywords || undefined,
       typeContrat: contract ? contractMap[contract] ?? contract : undefined,
+      distance,
       range: '0-49',
     });
   } catch (err) {

@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
 
   let text: string;
   let name: string;
+  let mode: 'ai' | 'original' = 'ai';
 
   const contentType = req.headers.get('content-type') ?? '';
 
@@ -90,6 +91,7 @@ export async function POST(req: NextRequest) {
     const form = await req.formData();
     const file = form.get('file') as File | null;
     name = decodeURIComponent((form.get('name') as string | null) ?? '') || 'CV importé';
+    mode = ((form.get('mode') as string | null) === 'original') ? 'original' : 'ai';
 
     if (!file) return NextResponse.json({ error: 'Aucun fichier reçu' }, { status: 400 });
 
@@ -103,6 +105,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     text = body.text ?? '';
     name = body.name ?? 'CV importé';
+    mode = body.mode === 'original' ? 'original' : 'ai';
   }
 
   if (!text || text.trim().length < 20) {
@@ -130,6 +133,41 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }, { status: 201 });
+  }
+
+  // Original mode: skip OpenAI, save raw text as the CV summary
+  if (mode === 'original') {
+    const originalContent = {
+      personal: { firstName: '', lastName: '', title: '', email: '', phone: '', city: '', linkedin: '' },
+      summary: text.slice(0, 4000),
+      experiences: [],
+      education: [],
+      skills: [],
+      languages: [],
+    };
+    try {
+      const cv = await prisma.cV.create({
+        data: { userId, name: name.slice(0, 100), template: 'modern', content: originalContent },
+      });
+      return NextResponse.json({ ...cv, truncated: false, truncatedAt: null }, { status: 201 });
+    } catch (err: unknown) {
+      if (isDbConnectionError(err)) {
+        return NextResponse.json({
+          id: `cv-import-${Date.now()}`,
+          userId,
+          name: name.slice(0, 100),
+          template: 'modern',
+          isDefault: false,
+          content: originalContent,
+          truncated: false,
+          truncatedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }, { status: 201 });
+      }
+      const message = err instanceof Error ? err.message : 'Erreur serveur';
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
   }
 
   const MAX_CHARS = 8000;

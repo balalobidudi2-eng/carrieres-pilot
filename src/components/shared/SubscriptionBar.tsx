@@ -38,47 +38,49 @@ export function SubscriptionBar({ collapsed }: { collapsed: boolean }) {
     (i) => VISIBLE_KEYS.includes(i.key) && i.enabled,
   );
 
+  // Show only the single most-pressed quota item to keep the sidebar compact
+  const criticalItem = items.reduce<UsageItem | null>((worst, item) => {
+    if (item.max === 0) return worst;
+    const pct = item.used / item.max;
+    if (!worst) return item;
+    return pct > (worst.used / worst.max) ? item : worst;
+  }, null);
+
   return (
-    <div className="border-t border-[#E2E8F0] px-3 py-3 space-y-2.5">
+    <div className="border-t border-[#E2E8F0] px-3 py-2 space-y-1.5 shrink-0">
       {/* Plan name */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-[#1E293B]">Plan {data.planName}</span>
-        <span className="text-[10px] text-[#94A3B8]">Renouvellement à {data.renewalTime}</span>
+        {data.plan === 'FREE' ? (
+          <Link href="/abonnement" className="flex items-center gap-0.5 text-[10px] font-semibold text-accent hover:text-accent/80 transition-colors">
+            Passer Pro <ArrowUpRight size={9} />
+          </Link>
+        ) : (
+          <span className="text-[10px] text-[#94A3B8]">↻ minuit</span>
+        )}
       </div>
 
-      {/* Usage bars */}
-      {items.map((item) => {
-        const pct = item.max > 0 ? Math.min(100, (item.used / item.max) * 100) : 0;
-        const isLow = item.remaining <= 1 && item.max > 0;
+      {/* Single critical usage bar */}
+      {criticalItem && (() => {
+        const pct = Math.min(100, (criticalItem.used / criticalItem.max) * 100);
+        const isLow = criticalItem.remaining <= 1 && criticalItem.max > 0;
         return (
-          <div key={item.key}>
+          <div>
             <div className="flex items-center justify-between mb-0.5">
-              <span className="text-[10px] text-[#64748B]">{LABEL_MAP[item.key] ?? item.key}</span>
+              <span className="text-[10px] text-[#64748B]">{LABEL_MAP[criticalItem.key] ?? criticalItem.key}</span>
               <span className={`text-[10px] font-medium ${isLow ? 'text-red-500' : 'text-[#64748B]'}`}>
-                {item.used}/{item.max} tâches
+                {criticalItem.used}/{criticalItem.max}
               </span>
             </div>
             <div className="w-full h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  isLow ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-accent'
-                }`}
+                className={`h-full rounded-full transition-all duration-300 ${isLow ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-accent'}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
           </div>
         );
-      })}
-
-      {/* Upgrade CTA for free plan */}
-      {data.plan === 'FREE' && (
-        <Link
-          href="/abonnement"
-          className="flex items-center justify-center gap-1 text-[10px] font-semibold text-accent hover:text-accent/80 bg-accent/5 rounded-md py-1.5 transition-colors"
-        >
-          Passer au Pro <ArrowUpRight size={10} />
-        </Link>
-      )}
+      })()}
     </div>
   );
 }

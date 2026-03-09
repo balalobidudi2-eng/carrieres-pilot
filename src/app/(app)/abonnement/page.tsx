@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Check,
@@ -111,11 +112,7 @@ export default function AbonnementPage() {
     onError: () => toast.error('Erreur lors de la redirection vers le paiement'),
   });
 
-  const portalMutation = useMutation({
-    mutationFn: () => api.post('/billing/portal').then((r) => r.data.url),
-    onSuccess: (url: string) => window.open(url, '_blank', 'noopener'),
-    onError: () => toast.error('Erreur'),
-  });
+  const router = useRouter();
 
   return (
     <motion.div initial="initial" animate="animate" variants={staggerContainer} className="space-y-8 max-w-[1000px]">
@@ -139,8 +136,7 @@ export default function AbonnementPage() {
             variant="outline"
             size="sm"
             className="ml-auto"
-            onClick={() => portalMutation.mutate()}
-            loading={portalMutation.isPending}
+            onClick={() => router.push('/facturation')}
           >
             <CreditCard size={14} />
             Gérer
@@ -240,9 +236,9 @@ export default function AbonnementPage() {
             <p className="font-semibold text-sm text-[#1E293B]">Gérer votre abonnement</p>
             <p className="text-xs text-[#64748B] mt-0.5">Modifier votre moyen de paiement, télécharger vos factures, annuler</p>
           </div>
-          <Button variant="outline" onClick={() => portalMutation.mutate()} loading={portalMutation.isPending}>
+          <Button variant="outline" onClick={() => router.push('/facturation')}>
             <ExternalLink size={14} />
-            Portail de facturation
+            Facturation & factures
           </Button>
         </motion.div>
       )}

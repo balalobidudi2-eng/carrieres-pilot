@@ -173,6 +173,7 @@ model DailyUsage {
   aiMatching      Int      @default(0)
   autoApply       Int      @default(0)
   interviewQuestions Int   @default(0)
+  application     Int      @default(0)
 
   @@unique([userId, date])
   @@index([userId])

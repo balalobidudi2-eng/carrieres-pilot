@@ -29,6 +29,7 @@ const QUOTA_DB_FIELD: Record<QuotaKey, string> = {
   ai_matching: 'aiMatching',
   auto_apply: 'autoApply',
   interview_questions: 'interviewQuestions',
+  application: 'application',
 };
 
 /** Get today's date string in Europe/Paris timezone */
@@ -48,6 +49,7 @@ function fallbackUsage() {
     aiMatching: maxValue,
     autoApply: maxValue,
     interviewQuestions: maxValue,
+    application: maxValue,
     date: todayStr(),
   };
 }

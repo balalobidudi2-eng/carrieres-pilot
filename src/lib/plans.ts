@@ -8,6 +8,7 @@ export interface PlanLimits {
   ai_matching: number;
   auto_apply: number;
   interview_questions: number;
+  application: number;
 }
 
 export interface PlanFeatures {
@@ -45,6 +46,7 @@ export const PLANS: Record<string, PlanConfig> = {
       ai_matching: 5,
       auto_apply: 0,
       interview_questions: 0,
+      application: 3,
     },
     features: {
       cv_generation: true,
@@ -72,6 +74,7 @@ export const PLANS: Record<string, PlanConfig> = {
       ai_matching: 50,
       auto_apply: 10,
       interview_questions: 2,
+      application: 50,
     },
     features: {
       cv_generation: true,
@@ -99,6 +102,7 @@ export const PLANS: Record<string, PlanConfig> = {
       ai_matching: 200,
       auto_apply: 100,
       interview_questions: 10,
+      application: 200,
     },
     features: {
       cv_generation: true,
@@ -124,4 +128,5 @@ export const QUOTA_LABELS: Record<keyof PlanLimits, string> = {
   ai_matching: 'Matchings IA',
   auto_apply: 'Candidatures auto',
   interview_questions: 'Préparations entretien',
+  application: 'Candidatures manuelles',
 };

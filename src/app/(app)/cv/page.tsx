@@ -31,6 +31,7 @@ export default function CVPage() {
   const [importName, setImportName] = useState('');
   const [importText, setImportText] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<'ai' | 'original'>('ai');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedCV, setSelectedCV] = useState<CV | null>(null);
   const [newCVName, setNewCVName] = useState('');
@@ -58,21 +59,27 @@ export default function CVPage() {
   });
 
   const importMutation = useMutation({
-    mutationFn: (data: { name: string; text: string; file?: File | null }) => {
+    mutationFn: (data: { name: string; text: string; file?: File | null; mode: 'ai' | 'original' }) => {
       if (data.file) {
         const form = new FormData();
         form.append('file', data.file);
         form.append('name', data.name);
+        form.append('mode', data.mode);
         return api.post('/cv/import', form).then((r) => r.data);
       }
-      return api.post('/cv/import', { name: data.name, text: data.text }).then((r) => r.data);
+      return api.post('/cv/import', { name: data.name, text: data.text, mode: data.mode }).then((r) => r.data);
     },
-    onSuccess: (cv: CV) => {
-      qc.invalidateQueries({ queryKey: ['cvs'] });
+    onSuccess: (cv: CV, variables) => {
+      // Update cache directly — survives DB offline + fake IDs
+      qc.setQueryData<CV[]>(['cvs'], (old = []) => [cv, ...(old ?? [])]);
       setImportOpen(false);
       setImportText('');
-      setImportName('');      setImportFile(null);      setSelectedCV(cv);
-      toast.success('CV importé et structuré par IA !');
+      setImportName('');
+      setImportFile(null);
+      setImportMode('ai');
+      // Only open CVEditor for AI mode (original mode just adds to list)
+      if (variables.mode === 'ai') setSelectedCV(cv);
+      toast.success(variables.mode === 'ai' ? 'CV importé et structuré par IA !' : 'CV importé et sauvegardé !');
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
@@ -103,7 +110,17 @@ export default function CVPage() {
         onClose={() => setSelectedCV(null)}
         onSave={(updated) => {
           setSelectedCV(updated);
-          qc.invalidateQueries({ queryKey: ['cvs'] });
+          // For fake IDs (offline / import fallback), update cache in-place instead of
+          // doing a fresh DB fetch that would drop the unsaved CV from the list.
+          if (/^cv(-import)?-\d+$/.test(updated.id)) {
+            qc.setQueryData<CV[]>(['cvs'], (old = []) => {
+              const exists = old?.some(c => c.id === updated.id);
+              if (exists) return old?.map(c => c.id === updated.id ? updated : c) ?? [updated];
+              return [updated, ...(old ?? [])];
+            });
+          } else {
+            qc.invalidateQueries({ queryKey: ['cvs'] });
+          }
         }}
       />
     );
@@ -277,12 +294,41 @@ export default function CVPage() {
       </Modal>
 
       {/* Import modal */}
-      <Modal open={importOpen} onClose={() => { setImportOpen(false); setImportFile(null); setImportText(''); }} title="Importer mon CV">
+      <Modal open={importOpen} onClose={() => { setImportOpen(false); setImportFile(null); setImportText(''); setImportMode('ai'); }} title="Importer mon CV">
         <div className="space-y-4">
           <p className="text-sm text-[#64748B]">
-            S\u00e9lectionnez un fichier <strong>.pdf</strong>, <strong>.docx</strong> ou <strong>.txt</strong>,
-            ou collez le texte ci-dessous. L\u2019IA va structurer votre CV automatiquement.
+            Sélectionnez un fichier <strong>.pdf</strong>, <strong>.docx</strong> ou <strong>.txt</strong>,
+            ou collez le texte ci-dessous.
           </p>
+
+          {/* Mode toggle */}
+          <div className="flex gap-2 p-1 bg-[#F7F8FC] rounded-xl">
+            <button
+              type="button"
+              onClick={() => setImportMode('ai')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                importMode === 'ai' ? 'bg-white text-accent shadow-sm' : 'text-[#64748B] hover:text-[#1E293B]'
+              }`}
+            >
+              <Sparkles size={13} />
+              Analyser avec l&apos;IA
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportMode('original')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                importMode === 'original' ? 'bg-white text-[#1E293B] shadow-sm' : 'text-[#64748B] hover:text-[#1E293B]'
+              }`}
+            >
+              <FileText size={13} />
+              Garder l&apos;original
+            </button>
+          </div>
+          {importMode === 'ai' ? (
+            <p className="text-xs text-[#64748B] -mt-1">🤖 L’IA parse votre fichier et extrait toutes les sections automatiquement.</p>
+          ) : (
+            <p className="text-xs text-[#64748B] -mt-1">📄 Le texte brut est sauvegardé tel quel, sans traitement — aucun crédit IA consommé.</p>
+          )}
 
           {/* File picker */}
           <input
@@ -341,12 +387,14 @@ export default function CVPage() {
 
           <Button
             fullWidth
-            onClick={() => importMutation.mutate({ name: importName || 'CV import\u00e9', text: importText, file: importFile })}
+            onClick={() => importMutation.mutate({ name: importName || 'CV importé', text: importText, file: importFile, mode: importMode })}
             loading={importMutation.isPending}
             disabled={!importFile && !importText.trim()}
           >
-            <Sparkles size={15} />
-            {importMutation.isPending ? 'Analyse en cours...' : 'Analyser et importer'}
+            {importMode === 'ai' ? <Sparkles size={15} /> : <FileText size={15} />}
+            {importMutation.isPending
+              ? (importMode === 'ai' ? 'Analyse en cours...' : 'Import en cours...')
+              : (importMode === 'ai' ? 'Analyser et importer' : 'Importer le CV')}
           </Button>
         </div>
       </Modal>

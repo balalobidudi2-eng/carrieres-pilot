@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -54,6 +54,7 @@ export default function LettresPage() {
   const [generated, setGenerated] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
+  const qc = useQueryClient();
 
   const { data: letters = [], refetch } = useQuery<CoverLetter[]>({
     queryKey: ['letters'],
@@ -119,12 +120,16 @@ export default function LettresPage() {
         form.append('file', data.file);
         form.append('jobTitle', encodeURIComponent(data.jobTitle));
         form.append('company', encodeURIComponent(data.company));
-        return api.post('/letters/import', form);
+        return api.post('/letters/import', form).then((r) => r.data);
       }
-      return api.post('/letters/import', { jobTitle: data.jobTitle, company: data.company, content: data.content });
+      return api.post('/letters/import', { jobTitle: data.jobTitle, company: data.company, content: data.content }).then((r) => r.data);
     },
-    onSuccess: () => {
-      refetch();
+    onSuccess: (letter) => {
+      // Update cache directly — prevents disappearing letter when DB is offline
+      qc.setQueryData<{ id: string; name: string; jobTitle?: string; companyName?: string; content: string; tone?: string | null; createdAt: string; updatedAt: string }[]>(
+        ['letters'],
+        (old = []) => [letter, ...old],
+      );
       setImportOpen(false);
       setImportJobTitle('');
       setImportCompany('');
@@ -206,7 +211,8 @@ export default function LettresPage() {
                   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(l.jobTitle || '')} — ${esc(l.companyName || '')}</title><style>body{font-family:'Segoe UI',Arial,sans-serif;max-width:700px;margin:60px auto;padding:40px;line-height:1.7;color:#1E293B}h1{font-size:18px;margin-bottom:4px}.meta{color:#64748B;font-size:14px;margin-bottom:32px}.content{white-space:pre-wrap;font-size:15px}@media print{body{margin:0}}</style></head><body><h1>${esc(l.jobTitle || '')}</h1><div class="meta">${esc(l.companyName || '')} · ${new Date(l.createdAt).toLocaleDateString('fr-FR')}</div><div class="content">${esc(l.content || '')}</div></body></html>`;
                   const w = window.open('', '_blank');
-                  if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
+                  if (!w) { toast.error('Popup bloqué — autorisez les popups pour ce site puis réessayez'); return; }
+                  w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400);
                 }}>
                   <Download size={12} />Télécharger PDF
                 </Button>
@@ -315,7 +321,8 @@ export default function LettresPage() {
                   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Lettre de motivation</title><style>body{font-family:'Segoe UI',Arial,sans-serif;max-width:700px;margin:60px auto;padding:40px;line-height:1.7;color:#1E293B}.content{white-space:pre-wrap;font-size:15px}@media print{body{margin:0}}</style></head><body><div class="content">${esc(generated!)}</div></body></html>`;
                   const w = window.open('', '_blank');
-                  if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
+                  if (!w) { toast.error('Popup bloqué — autorisez les popups pour ce site puis réessayez'); return; }
+                  w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400);
                 }}>
                   <Download size={14} />Télécharger PDF
                 </Button>

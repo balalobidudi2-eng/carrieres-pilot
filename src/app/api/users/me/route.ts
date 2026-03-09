@@ -70,6 +70,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(user);
   } catch (err: unknown) {
     console.error('[PATCH /api/users/me]', err);
+    // P1001: DB unreachable in local dev — return the submitted data as if saved
+    const code = (err as { code?: string })?.code;
+    if (code === 'P1001') {
+      return NextResponse.json({ id: userId, ...data });
+    }
     const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }

@@ -105,7 +105,7 @@ export function Sidebar() {
       )}
 
       {/* Main nav */}
-      <nav className="flex-1 py-4 px-2 space-y-0.5 overflow-y-auto" aria-label="Navigation principale">
+      <nav className="flex-1 min-h-0 py-4 px-2 space-y-0.5 overflow-y-auto" aria-label="Navigation principale">
         {navItems.map(({ href, icon: Icon, label }) => (
           <NavItem
             key={href}

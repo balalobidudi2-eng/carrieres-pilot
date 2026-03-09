@@ -39,7 +39,10 @@ const schema = z.object({
   location: z.string().optional(),
   currentTitle: z.string().optional(),
   bio: z.string().max(500).optional(),
-  linkedinUrl: z.string().url('URL invalide').optional().or(z.literal('')),
+  linkedinUrl: z.preprocess(
+    (v) => typeof v === 'string' && v && !v.startsWith('http') ? 'https://' + v : v,
+    z.string().url('URL invalide').optional().or(z.literal('')),
+  ),
   targetSalary: z.string().optional(),
   targetContract: z.array(z.string()).optional(),
   targetLocations: z.array(z.string()).optional(),
@@ -175,6 +178,24 @@ export default function ProfilPage() {
   const targetContract = watch('targetContract') ?? [];
   const targetSectors = watch('targetSectors') ?? [];
 
+  // Profile completion (0–100)
+  const watchedValues = watch();
+  const completionFields = [
+    watchedValues.firstName,
+    watchedValues.lastName,
+    watchedValues.phone,
+    watchedValues.location,
+    watchedValues.currentTitle,
+    watchedValues.bio,
+    watchedValues.linkedinUrl,
+    watchedValues.targetSalary,
+    (watchedValues.targetContract ?? []).length > 0 ? 'ok' : '',
+    (watchedValues.skills ?? []).length > 0 ? 'ok' : '',
+    (cvs ?? []).length > 0 ? 'ok' : '',
+    (letters ?? []).length > 0 ? 'ok' : '',
+  ];
+  const completionPct = Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100);
+
   const TABS = [
     { id: 'info', label: 'Informations', icon: User },
     { id: 'preferences', label: 'Préférences', icon: Target },
@@ -204,9 +225,19 @@ export default function ProfilPage() {
               {user.plan}
             </span>
           )}
+          {/* Profile completion indicator */}
+          <div className="flex items-center gap-2 mt-2">
+            <div className="w-32 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${completionPct < 40 ? 'bg-red-400' : completionPct < 70 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                style={{ width: `${completionPct}%` }}
+              />
+            </div>
+            <span className="text-xs text-[#64748B] font-medium">{completionPct}% complet</span>
+          </div>
         </div>
         <div className="ml-auto">
-          <Button onClick={handleSubmit((d) => saveMutation.mutate(d))} loading={saveMutation.isPending} disabled={!isDirty}>
+          <Button onClick={handleSubmit((d) => saveMutation.mutate(d))} loading={saveMutation.isPending}>
             <Save size={15} />
             Enregistrer
           </Button>

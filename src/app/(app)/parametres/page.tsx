@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,7 +18,12 @@ import {
   Globe,
   Moon,
   Sun,
+  Mail,
+  CheckCircle,
+  XCircle,
+  ExternalLink,
 } from 'lucide-react';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/Button';
@@ -99,6 +104,13 @@ export default function ParametresPage() {
   });
 
   const isDeleteReady = deleteConfirm === 'irréversible';
+
+  const { data: smtpStatus } = useQuery({
+    queryKey: ['smtp-status'],
+    queryFn: () => api.get('/smtp/status').then((r) => r.data as { configured: boolean; host: string | null; from: string | null }),
+    staleTime: 60_000,
+    retry: false,
+  });
 
   return (
     <motion.div
@@ -262,6 +274,49 @@ export default function ParametresPage() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* ── Email & SMTP ─────────────────────────────────────── */}
+      <motion.section
+        variants={fadeInUp}
+        className="bg-white rounded-card border border-[#E2E8F0] overflow-hidden"
+        style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}
+      >
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-[#E2E8F0]">
+          <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
+            <Mail size={16} className="text-teal-600" />
+          </div>
+          <h2 className="font-heading font-semibold text-[#1E293B]">Email &amp; SMTP</h2>
+        </div>
+        <div className="p-6 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-[#1E293B]">Configuration SMTP</p>
+            <p className="text-xs text-[#94A3B8] mt-0.5">
+              {smtpStatus?.configured
+                ? `Serveur : ${smtpStatus.host} · Expéditeur : ${smtpStatus.from}`
+                : 'Non configuré — les emails (alertes, candidatures) ne seront pas envoyés.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {smtpStatus?.configured ? (
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 bg-green-50 border border-green-100 rounded-full px-2.5 py-1">
+                <CheckCircle size={13} />
+                Configuré
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1">
+                <XCircle size={13} />
+                Non configuré
+              </span>
+            )}
+            <Link href="/parametres/smtp">
+              <Button variant="outline" size="sm">
+                <ExternalLink size={13} />
+                Configurer
+              </Button>
+            </Link>
           </div>
         </div>
       </motion.section>

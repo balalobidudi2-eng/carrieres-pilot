@@ -14,13 +14,43 @@ export async function POST(
     return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
   }
 
+  // Read body once — includes content sent by CVEditor for fake-ID CVs
+  let bodyContent: Record<string, unknown> | null = null;
   try {
-  const cv = await prisma.cV.findUnique({ where: { id: params.id } });
-  if (!cv || cv.userId !== userId) {
-    return NextResponse.json({ error: 'CV non trouve' }, { status: 404 });
-  }
+    const body = await req.json();
+    if (body?.content && typeof body.content === 'object') bodyContent = body.content as Record<string, unknown>;
+  } catch { /* body is optional */ }
 
-  const content = cv.content as Record<string, unknown>;
+  const isFakeId = /^cv(-import)?-\d+$/.test(params.id);
+
+  let cvName = 'Curriculum Vitae';
+  let content: Record<string, unknown>;
+
+  if (isFakeId) {
+    if (!bodyContent) return NextResponse.json({ error: 'Contenu manquant pour un CV local' }, { status: 400 });
+    content = bodyContent;
+  } else {
+    let cv: { id: string; userId: string; name: string; content: unknown } | null = null;
+    try {
+      cv = await prisma.cV.findUnique({ where: { id: params.id } });
+    } catch (dbErr: unknown) {
+      // P1001: DB unreachable — fall back to body content if available
+      const code = (dbErr as { code?: string })?.code;
+      if (code === 'P1001' && bodyContent) { content = bodyContent; }
+      else return NextResponse.json({ error: 'Base de donn\u00e9es inaccessible' }, { status: 503 });
+    }
+
+    if (!content!) {
+      if (!cv || cv.userId !== userId) {
+        if (bodyContent) { content = bodyContent; }
+        else return NextResponse.json({ error: 'CV non trouve' }, { status: 404 });
+      } else {
+        cvName = cv.name;
+        content = cv.content as Record<string, unknown>;
+      }
+    }
+  }
+  try {
   const p = (content.personal ?? {}) as Record<string, string | undefined>;
   const summary = content.summary as string | undefined;
   const experiences = (content.experiences ?? []) as Array<Record<string, unknown>>;
@@ -59,7 +89,7 @@ export async function POST(
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>${esc(cv.name)}</title>
+<title>${esc(cvName)}</title>
 <style>
   @page { margin: 18mm; size: A4; }
   body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #1E293B; font-size: 11pt; line-height: 1.5; margin: 0; padding: 0; }

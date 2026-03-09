@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -22,12 +23,16 @@ import {
   TrendingUp,
   Kanban,
   ChevronDown,
+  Bot,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/axios';
 import { staggerContainer, fadeInUp } from '@/lib/animations';
+import { PLANS } from '@/lib/plans';
+import { useAuthStore } from '@/stores/authStore';
 import type { JobOffer } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -36,10 +41,22 @@ const SECTORS = ['Tous', 'Tech', 'Design', 'Marketing', 'Finance', 'Santé', 'Re
 
 export default function OffresPage() {
   const qc = useQueryClient();
-  const [query, setQuery] = useState('');
+  const { user } = useAuthStore();
+  const planConfig = PLANS[user?.plan ?? 'FREE'] ?? PLANS.FREE;
+  const canAutoApply = planConfig.features.auto_apply;
+  const autoApplyLimit = planConfig.dailyLimits.auto_apply;
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [contract, setContract] = useState('Tous');
   const [sector, setSector] = useState('Tous');
-  const [tab, setTab] = useState<'recommended' | 'all'>('recommended');
+  const [distance, setDistance] = useState<number>(0);
+  const [tab, setTab] = useState<'recommended' | 'all'>(searchParams.get('q') ? 'all' : 'recommended');
+
+  // Sync URL param changes (e.g. navigating from GlobalSearchModal)
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) { setQuery(q); setTab('all'); }
+  }, [searchParams]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // F1 — saved offer IDs (local state, backed by /offers/[id]/save)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -66,11 +83,16 @@ export default function OffresPage() {
   };
 
   const { data: offers = [], isLoading } = useQuery<JobOffer[]>({
-    queryKey: ['offers', tab, query, contract, sector],
+    queryKey: ['offers', tab, query, contract, sector, distance],
     queryFn: () =>
       api
         .get(tab === 'recommended' ? '/offers/recommended' : '/offers', {
-          params: { q: query, contract: contract !== 'Tous' ? contract : undefined, sector: sector !== 'Tous' ? sector : undefined },
+          params: {
+            q: query,
+            contract: contract !== 'Tous' ? contract : undefined,
+            sector: sector !== 'Tous' ? sector : undefined,
+            distance: distance > 0 ? distance : undefined,
+          },
         })
         .then((r) => r.data),
     placeholderData: keepPreviousData,
@@ -112,6 +134,31 @@ export default function OffresPage() {
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erreur lors de la création';
+      toast.error(msg);
+    },
+  });
+
+  const autoApplyMutation = useMutation({
+    mutationFn: (offer: JobOffer) =>
+      api.post('/applications/auto-fill', {
+        applicationUrl: offer.url,
+        firstName: user?.firstName ?? '',
+        lastName: user?.lastName ?? '',
+        email: user?.email ?? '',
+        phone: user?.phone,
+        linkedinUrl: user?.linkedinUrl,
+      }).then((r) => r.data as { success: boolean; status: string; message: string }),
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success('Candidature envoyée automatiquement !');
+        qc.invalidateQueries({ queryKey: ['application-stats'] });
+      } else {
+        toast(data.message, { icon: '⚠️' });
+      }
+    },
+    onError: (err: unknown) => {
+      const d = (err as { response?: { data?: { error?: string; message?: string } } })?.response?.data;
+      const msg = d?.error ?? d?.message ?? 'Erreur lors de la candidature automatique';
       toast.error(msg);
     },
   });
@@ -175,7 +222,7 @@ export default function OffresPage() {
 
       {/* F6 — Mini stats bar */}
       {appStats && (
-        <motion.div variants={fadeInUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <motion.div variants={fadeInUp} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
             { label: 'Favoris sauvegardés', value: savedIds.size, icon: '📌', color: '#6B7280' },
             { label: 'Candidatures totales', value: appStats.totalApplications, icon: '📤', color: '#3B82F6' },
@@ -194,6 +241,26 @@ export default function OffresPage() {
               </div>
             </div>
           ))}
+          {/* Auto-apply quota stat */}
+          <div
+            className={`bg-white rounded-card border px-4 py-3 flex items-center gap-3 ${
+              canAutoApply ? 'border-accent/30' : 'border-[#E2E8F0]'
+            }`}
+            style={{ boxShadow: '0 2px 12px rgba(15,52,96,0.05)' }}
+          >
+            <Bot size={20} className={canAutoApply ? 'text-accent' : 'text-[#CBD5E1]'} />
+            <div>
+              <p className="font-heading font-bold text-[#1E293B] text-lg leading-none">
+                {canAutoApply ? autoApplyLimit : <Lock size={14} className="inline text-[#CBD5E1]" />}
+              </p>
+              <p className="text-[11px] text-[#64748B] mt-0.5">
+                {canAutoApply ? 'Candidatures IA/j' : 'Postuler via IA'}
+              </p>
+              {!canAutoApply && (
+                <a href="/parametres" className="text-[10px] text-accent font-semibold hover:underline">Passer Pro</a>
+              )}
+            </div>
+          </div>
         </motion.div>
       )}
 
@@ -281,7 +348,10 @@ export default function OffresPage() {
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (tab === 'recommended' && e.target.value.trim()) setTab('all');
+          }}
             placeholder="Titre, entreprise, compétence…"
             className="w-full pl-9 pr-4 py-2.5 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 bg-white"
           />
@@ -315,6 +385,23 @@ export default function OffresPage() {
               {s}
             </button>
           ))}
+        </div>
+
+        {/* Distance filter */}
+        <div className="flex items-center gap-2">
+          <MapPin size={14} className="text-[#94A3B8] shrink-0" />
+          <select
+            value={distance}
+            onChange={(e) => setDistance(Number(e.target.value))}
+            className="px-3 py-2 border border-[#E2E8F0] rounded-btn text-xs font-semibold bg-white text-[#64748B] focus:outline-none focus:border-accent transition-colors"
+          >
+            <option value={0}>Toute la France</option>
+            <option value={5}>5 km</option>
+            <option value={10}>10 km</option>
+            <option value={20}>20 km</option>
+            <option value={30}>30 km</option>
+            <option value={50}>50 km</option>
+          </select>
         </div>
       </motion.div>
 
@@ -426,7 +513,7 @@ export default function OffresPage() {
             <p className="text-xs text-[#64748B] mt-2 line-clamp-2 leading-relaxed">{offer.description}</p>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               <Button
                 size="sm"
                 onClick={() => applyMutation.mutate(offer)}
@@ -434,6 +521,27 @@ export default function OffresPage() {
               >
                 Postuler
               </Button>
+              {canAutoApply ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => autoApplyMutation.mutate(offer)}
+                  loading={autoApplyMutation.isPending && autoApplyMutation.variables?.id === offer.id}
+                  title="L'IA remplit et soumet le formulaire de candidature automatiquement"
+                >
+                  <Bot size={13} />
+                  Postuler via IA
+                </Button>
+              ) : (
+                <button
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-btn text-xs font-semibold text-[#94A3B8] bg-[#F7F8FC] border border-[#E2E8F0] cursor-not-allowed"
+                  title="Fonctionnalité Pro — passez au plan Pro pour postuler automatiquement via l'IA"
+                  disabled
+                >
+                  <Lock size={11} />
+                  Postuler via IA
+                </button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

@@ -78,16 +78,15 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
 
   const generatePDFMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.post(`/cv/${cv.id}/generate-pdf`, {}, { responseType: 'text' });
+      const res = await api.post(`/cv/${cv.id}/generate-pdf`, { content: getValues() }, { responseType: 'text' });
       return res.data;
     },
     onSuccess: (html: string) => {
       const w = window.open('', '_blank');
-      if (w) {
-        w.document.write(html);
-        w.document.close();
-        setTimeout(() => w.print(), 500);
-      }
+      if (!w) { toast.error('Popup bloqué — autorisez les popups pour ce site puis réessayez'); return; }
+      w.document.write(html);
+      w.document.close();
+      setTimeout(() => w.print(), 500);
     },
     onError: (err: unknown) => {
       const msg = (err as any)?.response?.data?.error ?? 'Erreur export PDF';
