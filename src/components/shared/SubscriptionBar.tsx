@@ -8,13 +8,15 @@ import { api } from '@/lib/axios';
 const LABEL_MAP: Record<string, string> = {
   cv_generation: 'CV',
   cover_letter: 'Lettres',
-  job_search: 'Recherches',
+  job_search: 'Recherches IA',
   ai_matching: 'Matchings IA',
-  auto_apply: 'Candidatures auto',
+  auto_apply: 'Candidatures IA',
+  application: 'Candidatures',
+  interview_questions: 'Entretiens IA',
 };
 
-/** Visible quota keys to show in the sidebar bar */
-const VISIBLE_KEYS = ['cv_generation', 'cover_letter', 'auto_apply'];
+/** Quota keys shown in the sidebar (CV, Lettres, Recherches) */
+const VISIBLE_KEYS = ['cv_generation', 'cover_letter', 'job_search'];
 
 interface UsageItem {
   key: string;
@@ -35,19 +37,11 @@ export function SubscriptionBar({ collapsed }: { collapsed: boolean }) {
   if (!data || collapsed) return null;
 
   const items = (data.items as UsageItem[]).filter(
-    (i) => VISIBLE_KEYS.includes(i.key) && i.enabled,
+    (i) => VISIBLE_KEYS.includes(i.key) && i.max > 0,
   );
 
-  // Show only the single most-pressed quota item to keep the sidebar compact
-  const criticalItem = items.reduce<UsageItem | null>((worst, item) => {
-    if (item.max === 0) return worst;
-    const pct = item.used / item.max;
-    if (!worst) return item;
-    return pct > (worst.used / worst.max) ? item : worst;
-  }, null);
-
   return (
-    <div className="border-t border-[#E2E8F0] px-3 py-2 space-y-1.5 shrink-0">
+    <div className="border-t border-[#E2E8F0] px-3 py-2 space-y-2 shrink-0">
       {/* Plan name */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-[#1E293B]">Plan {data.planName}</span>
@@ -60,27 +54,33 @@ export function SubscriptionBar({ collapsed }: { collapsed: boolean }) {
         )}
       </div>
 
-      {/* Single critical usage bar */}
-      {criticalItem && (() => {
-        const pct = Math.min(100, (criticalItem.used / criticalItem.max) * 100);
-        const isLow = criticalItem.remaining <= 1 && criticalItem.max > 0;
+      {/* Quota bars — CV / Lettres / Recherches IA */}
+      {items.map((item) => {
+        const used = Math.round(Number(item.used) || 0);
+        const max = Math.round(Number(item.max) || 1);
+        const pct = Math.min(100, (used / max) * 100);
+        const isLow = item.remaining <= 1;
         return (
-          <div>
+          <div key={item.key}>
             <div className="flex items-center justify-between mb-0.5">
-              <span className="text-[10px] text-[#64748B]">{LABEL_MAP[criticalItem.key] ?? criticalItem.key}</span>
-              <span className={`text-[10px] font-medium ${isLow ? 'text-red-500' : 'text-[#64748B]'}`}>
-                {criticalItem.used}/{criticalItem.max}
+              <span className="text-[10px] text-[#64748B]">
+                {used}&nbsp;{LABEL_MAP[item.key] ?? item.key}&nbsp;/&nbsp;{max}
               </span>
+              {isLow && max > 0 && (
+                <span className="text-[9px] text-red-400 font-semibold">Épuisé</span>
+              )}
             </div>
-            <div className="w-full h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
+            <div className="w-full h-1 bg-[#E2E8F0] rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${isLow ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-accent'}`}
+                className={`h-full rounded-full transition-all duration-300 ${
+                  isLow ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-accent'
+                }`}
                 style={{ width: `${pct}%` }}
               />
             </div>
           </div>
         );
-      })()}
+      })}
     </div>
   );
 }

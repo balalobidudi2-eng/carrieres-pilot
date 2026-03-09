@@ -109,7 +109,14 @@ export default function AbonnementPage() {
     mutationFn: (plan: 'PRO' | 'EXPERT') =>
       api.post('/billing/checkout', { plan }).then((r) => r.data.url),
     onSuccess: (url: string) => window.location.href = url,
-    onError: () => toast.error('Erreur lors de la redirection vers le paiement'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? '';
+      if (msg.includes('configuré') || msg.includes('Stripe')) {
+        toast.error('Le paiement en ligne n\'est pas encore disponible. Contactez-nous pour activer votre plan manuellement.');
+      } else {
+        toast.error('Erreur lors de la redirection vers le paiement');
+      }
+    },
   });
 
   const router = useRouter();

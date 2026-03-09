@@ -39,6 +39,7 @@ export default function CVPage() {
   const { data: cvList, isLoading } = useQuery<CV[]>({
     queryKey: ['cvs'],
     queryFn: () => api.get('/cv').then((r) => r.data),
+    staleTime: 2 * 60 * 1000, // évite la disparition du CV lors de la navigation
   });
 
   const createMutation = useMutation({

@@ -9,7 +9,6 @@ import {
   ExternalLink,
   Send,
   Info,
-  Terminal,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
@@ -50,14 +49,6 @@ const PROVIDERS = [
   },
 ];
 
-const ENV_VARS = [
-  { key: 'SMTP_HOST', example: 'smtp.gmail.com', desc: 'Serveur SMTP' },
-  { key: 'SMTP_PORT', example: '587', desc: 'Port (587 = TLS, 465 = SSL)' },
-  { key: 'SMTP_SECURE', example: 'false', desc: '"true" pour SSL (port 465), "false" pour TLS' },
-  { key: 'SMTP_USER', example: 'votre@email.com', desc: 'Identifiant SMTP / email' },
-  { key: 'SMTP_PASS', example: 'votre_mot_de_passe_app', desc: 'Mot de passe ou mot de passe d\'app' },
-  { key: 'SMTP_FROM', example: 'noreply@carrieres-pilot.fr', desc: 'Adresse expéditeur affichée' },
-];
 
 export default function SmtpConfigPage() {
   const testMutation = useMutation({
@@ -95,8 +86,8 @@ export default function SmtpConfigPage() {
         <div>
           <p className="text-sm font-semibold text-[#1E293B]">Comment ça fonctionne ?</p>
           <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
-            CarrièrePilot utilise votre propre serveur SMTP pour envoyer les emails (alertes emploi, candidatures automatiques, notifications).
-            La configuration se fait via les variables d&apos;environnement dans le fichier <code className="bg-blue-100/70 px-1 rounded text-blue-700">.env</code> à la racine du projet.
+            CarrièrePilot peut utiliser votre propre adresse email pour envoyer les alertes emploi, les candidatures automatiques et les notifications.
+            Suivez le guide ci-dessous pour configurer Gmail en moins de 5 minutes.
           </p>
         </div>
       </motion.div>
@@ -138,53 +129,87 @@ export default function SmtpConfigPage() {
         </div>
       </motion.div>
 
-      {/* .env instructions */}
+      {/* Gmail step-by-step guide */}
       <motion.div
         variants={fadeInUp}
         className="bg-white rounded-card border border-[#E2E8F0] overflow-hidden"
         style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}
       >
         <div className="flex items-center gap-3 px-6 py-4 border-b border-[#E2E8F0]">
-          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-            <Terminal size={16} className="text-slate-600" />
+          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+            <span className="text-base">📋</span>
           </div>
-          <h3 className="font-heading font-semibold text-[#1E293B]">Variables d&apos;environnement</h3>
+          <div>
+            <h3 className="font-heading font-semibold text-[#1E293B]">Guide Gmail — étape par étape</h3>
+            <p className="text-xs text-[#64748B] mt-0.5">La méthode la plus simple, recommandée pour démarrer</p>
+          </div>
         </div>
-        <div className="px-6 py-4 space-y-4">
-          <p className="text-xs text-[#64748B]">
-            Modifiez votre fichier <code className="bg-[#F7F8FC] border border-[#E2E8F0] px-1.5 py-0.5 rounded text-[#1E293B] font-mono">.env</code> à la racine du projet et redémarrez le serveur :
-          </p>
+        <div className="px-6 py-5 space-y-6">
 
-          {/* Code block */}
-          <div className="bg-[#1E293B] rounded-xl overflow-x-auto">
-            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10">
-              <span className="w-3 h-3 rounded-full bg-red-400" />
-              <span className="w-3 h-3 rounded-full bg-amber-400" />
-              <span className="w-3 h-3 rounded-full bg-green-400" />
-              <span className="text-xs text-white/40 ml-2 font-mono">.env</span>
+          {/* Step 1 */}
+          <div className="flex gap-4">
+            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 font-heading font-bold text-accent text-sm">1</div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-[#1E293B]">Activez la validation en deux étapes</p>
+              <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
+                Allez dans votre compte Google → <strong>Sécurité</strong> → <strong>Validation en deux étapes</strong> et activez-la.
+                C&apos;est obligatoire avant de pouvoir générer un mot de passe d&apos;application.
+              </p>
+              <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-accent font-semibold hover:underline mt-1.5">
+                Ouvrir la sécurité Google <ExternalLink size={10} />
+              </a>
             </div>
-            <pre className="px-4 py-4 text-xs text-emerald-300 font-mono leading-relaxed overflow-x-auto">
-{`# ─── SMTP (Email) ────────────────────────────────────
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT="587"
-SMTP_SECURE="false"
-SMTP_USER="votre@gmail.com"
-SMTP_PASS="xxxx xxxx xxxx xxxx"   # mot de passe d'app
-SMTP_FROM="votre@gmail.com"`}
-            </pre>
           </div>
 
-          {/* Field reference */}
-          <div className="space-y-2 pt-2">
-            {ENV_VARS.map(({ key, example, desc }) => (
-              <div key={key} className="flex items-start gap-3 text-xs">
-                <code className="font-mono text-accent bg-accent/5 border border-accent/15 px-2 py-0.5 rounded shrink-0">{key}</code>
-                <div>
-                  <span className="text-[#1E293B] font-medium">{desc}</span>
-                  <span className="text-[#94A3B8] ml-2">ex: <em>{example}</em></span>
-                </div>
+          {/* Step 2 */}
+          <div className="flex gap-4">
+            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 font-heading font-bold text-accent text-sm">2</div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-[#1E293B]">Créez un mot de passe d&apos;application</p>
+              <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
+                Dans <strong>Sécurité</strong>, cherchez <strong>Mots de passe des applications</strong>.
+                Choisissez <em>Autre (nom personnalisé)</em>, tapez <strong>CarrièrePilot</strong> et cliquez sur <strong>Générer</strong>.
+              </p>
+              <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-accent font-semibold hover:underline mt-1.5">
+                Créer un mot de passe d&apos;app <ExternalLink size={10} />
+              </a>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="flex gap-4">
+            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 font-heading font-bold text-accent text-sm">3</div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-[#1E293B]">Copiez le mot de passe généré</p>
+              <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
+                Google affiche un mot de passe de <strong>16 caractères</strong> (ex&nbsp;: <em>xxxx xxxx xxxx xxxx</em>).
+                Copiez-le immédiatement — il ne sera affiché qu&apos;une seule fois.
+              </p>
+            </div>
+          </div>
+
+          {/* Step 4 */}
+          <div className="flex gap-4">
+            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0 font-heading font-bold text-accent text-sm">4</div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-[#1E293B]">Utilisez ces paramètres dans CarrièrePilot</p>
+              <div className="mt-2 bg-[#F7F8FC] border border-[#E2E8F0] rounded-xl p-4 space-y-2">
+                {[
+                  { label: 'Serveur', value: 'smtp.gmail.com' },
+                  { label: 'Port', value: '587 (TLS)' },
+                  { label: 'Identifiant', value: 'votre adresse Gmail complète' },
+                  { label: 'Mot de passe', value: 'le mot de passe d\'app généré à l\'étape 3' },
+                  { label: 'Expéditeur', value: 'votre adresse Gmail (ou noreply@carrieres-pilot.fr)' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex gap-2 text-xs">
+                    <span className="font-semibold text-[#1E293B] shrink-0 w-24">{label}&nbsp;:</span>
+                    <span className="text-[#64748B]">{value}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </motion.div>

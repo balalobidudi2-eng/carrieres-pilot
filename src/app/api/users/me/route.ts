@@ -70,10 +70,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(user);
   } catch (err: unknown) {
     console.error('[PATCH /api/users/me]', err);
-    // P1001: DB unreachable in local dev — return the submitted data as if saved
     const code = (err as { code?: string })?.code;
+    // P1001: DB unreachable in local dev — return submitted data as if saved
     if (code === 'P1001') {
       return NextResponse.json({ id: userId, ...data });
+    }
+    // P2025: user not found in DB (e.g. registered locally, using prod DB)
+    if (code === 'P2025') {
+      return NextResponse.json({ error: 'Profil introuvable. Veuillez vous reconnecter ou créer un nouveau compte en production.' }, { status: 404 });
     }
     const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });

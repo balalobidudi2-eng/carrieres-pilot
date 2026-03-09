@@ -545,7 +545,8 @@ function OffresPageContent() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.open(offer.url, '_blank', 'noopener')}
+                onClick={() => offer.url && window.open(offer.url, '_blank', 'noopener,noreferrer')}
+                disabled={!offer.url}
               >
                 <ExternalLink size={13} />
                 Voir l&apos;offre

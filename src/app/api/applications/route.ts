@@ -93,6 +93,10 @@ export async function POST(req: NextRequest) {
       }, { status: 201 });
     }
     console.error('[POST /api/applications]', err);
+    const code = (err as { code?: string })?.code;
+    if (code === 'P2003') {
+      return NextResponse.json({ error: 'Session expirée ou compte introuvable. Reconnectez-vous.' }, { status: 403 });
+    }
     return NextResponse.json({ error: 'Erreur serveur lors de la création' }, { status: 500 });
   }
 }

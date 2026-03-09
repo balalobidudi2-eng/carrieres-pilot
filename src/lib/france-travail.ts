@@ -10,13 +10,24 @@ const FT_API_BASE = 'https://api.francetravail.io/partenaire/offresdemploi/v2';
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
+/** Fetch wrapper with AbortController timeout (default 12s) to avoid serverless hangs */
+async function fetchFT(url: string, options: RequestInit = {}, timeoutMs = 12_000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 async function getAccessToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) return cachedToken.token;
 
   const clientId = process.env.FRANCE_TRAVAIL_CLIENT_ID!;
   const clientSecret = process.env.FRANCE_TRAVAIL_CLIENT_SECRET!;
 
-  const res = await fetch(FT_AUTH_URL, {
+  const res = await fetchFT(FT_AUTH_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -93,7 +104,7 @@ export async function searchOffers(params: OfferSearchParams): Promise<FTSearchR
   qs.set('range', params.range ?? '0-49');
   if (params.sort !== undefined) qs.set('sort', String(params.sort));
 
-  const res = await fetch(`${FT_API_BASE}/offres/search?${qs.toString()}`, {
+  const res = await fetchFT(`${FT_API_BASE}/offres/search?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
 
@@ -103,7 +114,7 @@ export async function searchOffers(params: OfferSearchParams): Promise<FTSearchR
     if (res.status === 401 && cachedToken) {
       cachedToken = null;
       const newToken = await getAccessToken();
-      const retry = await fetch(`${FT_API_BASE}/offres/search?${qs.toString()}`, {
+      const retry = await fetchFT(`${FT_API_BASE}/offres/search?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${newToken}`, Accept: 'application/json' },
       });
       if (retry.ok) return retry.json();
@@ -118,7 +129,7 @@ export async function searchOffers(params: OfferSearchParams): Promise<FTSearchR
 
 export async function getOfferById(id: string): Promise<FTOffer> {
   const token = await getAccessToken();
-  const res = await fetch(`${FT_API_BASE}/offres/${id}`, {
+  const res = await fetchFT(`${FT_API_BASE}/offres/${id}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`France Travail offer error: ${res.status}`);
