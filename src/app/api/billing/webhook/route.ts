@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, handleWebhookEvent } from '@/lib/stripe-service';
+import { getStripe, handleWebhookEvent } from '@/lib/stripe-service';
 
 /** POST /api/billing/webhook — Stripe webhook handler */
 export async function POST(req: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
   let event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    event = getStripe().webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     return NextResponse.json({ error: 'Signature invalide' }, { status: 400 });
   }

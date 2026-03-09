@@ -1,9 +1,19 @@
 import Stripe from 'stripe';
 import { prisma } from './prisma';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-04-10' as Stripe.LatestApiVersion,
-});
+let _stripe: Stripe | null = null;
+
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-04-10' as Stripe.LatestApiVersion,
+    });
+  }
+  return _stripe;
+}
 
 const PRICES = {
   PRO: process.env.STRIPE_PRO_PRICE_ID!,
@@ -15,7 +25,7 @@ export async function createCheckoutSession(userId: string, plan: 'PRO' | 'EXPER
 
   let customerId = user.stripeCustomerId;
   if (!customerId) {
-    const customer = await stripe.customers.create({
+    const customer = await getStripe().customers.create({
       email: user.email,
       name: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
       metadata: { userId },
@@ -24,7 +34,7 @@ export async function createCheckoutSession(userId: string, plan: 'PRO' | 'EXPER
     await prisma.user.update({ where: { id: userId }, data: { stripeCustomerId: customerId } });
   }
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     line_items: [{ price: PRICES[plan], quantity: 1 }],
@@ -39,7 +49,7 @@ export async function createCheckoutSession(userId: string, plan: 'PRO' | 'EXPER
 export async function createBillingPortal(userId: string, origin: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   if (!user.stripeCustomerId) throw new Error('No Stripe customer');
-  const portal = await stripe.billingPortal.sessions.create({
+  const portal = await getStripe().billingPortal.sessions.create({
     customer: user.stripeCustomerId,
     return_url: `${origin}/abonnement`,
   });
