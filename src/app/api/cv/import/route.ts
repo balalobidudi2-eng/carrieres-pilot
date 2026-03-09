@@ -15,25 +15,29 @@ function isDbConnectionError(err: unknown): boolean {
 }
 
 async function extractText(file: File): Promise<string> {
-  const name = file.name.toLowerCase();
   const buffer = Buffer.from(await file.arrayBuffer());
+  const name   = file.name.toLowerCase();
 
-  if (name.endsWith('.txt')) {
-    return buffer.toString('utf-8');
-  }
+  if (name.endsWith('.txt')) return buffer.toString('utf-8');
 
   if (name.endsWith('.pdf')) {
-    // pdf-parse is a CJS module; use require to avoid ESM .default issue
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
-    const data = await pdfParse(buffer);
-    return data.text;
+    try {
+      const pdfParse = (await import('pdf-parse')).default as (buf: Buffer, options?: { max?: number }) => Promise<{ text: string }>;
+      const result   = await pdfParse(buffer, { max: 0 });
+      return result.text || '';
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('XRef') || msg.includes('bad') || msg.includes('Invalid PDF')) {
+        return '[PDF importé — extraction partielle non disponible]';
+      }
+      throw new Error('Ce PDF semble corrompu ou protégé. Essayez de l\'exporter à nouveau ou utilisez le format .txt / .docx');
+    }
   }
 
   if (name.endsWith('.doc') || name.endsWith('.docx')) {
-    const mammoth = await import('mammoth');
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value;
+    const mammoth = (await import('mammoth')).default as { extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }> };
+    const result  = await mammoth.extractRawText({ buffer });
+    return result.value || '';
   }
 
   throw new Error('Format non supporté. Utilisez .txt, .pdf ou .docx');
@@ -83,7 +87,7 @@ export async function POST(req: NextRequest) {
   if (contentType.includes('multipart/form-data')) {
     const form = await req.formData();
     const file = form.get('file') as File | null;
-    name = (form.get('name') as string | null) ?? 'CV importé';
+    name = decodeURIComponent((form.get('name') as string | null) ?? '') || 'CV importé';
 
     if (!file) return NextResponse.json({ error: 'Aucun fichier reçu' }, { status: 400 });
 

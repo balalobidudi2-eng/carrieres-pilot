@@ -117,8 +117,8 @@ export default function LettresPage() {
       if (data.file) {
         const form = new FormData();
         form.append('file', data.file);
-        form.append('jobTitle', data.jobTitle);
-        form.append('company', data.company);
+        form.append('jobTitle', encodeURIComponent(data.jobTitle));
+        form.append('company', encodeURIComponent(data.company));
         return api.post('/letters/import', form);
       }
       return api.post('/letters/import', { jobTitle: data.jobTitle, company: data.company, content: data.content });
