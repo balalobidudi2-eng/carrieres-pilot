@@ -61,7 +61,7 @@ Règles :
 - Réponds UNIQUEMENT avec le JSON, sans explication ni markdown
 
 Texte du CV :
-${text.slice(0, 8000)}`;
+${text}`;
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -144,6 +144,12 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     console.error('[CV IMPORT] OpenAI error:', err);
     const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    if (msg.includes('API key') || msg.includes('Incorrect API key')) {
+      return NextResponse.json({ error: 'Clé OpenAI invalide ou manquante. Vérifiez OPENAI_API_KEY dans .env' }, { status: 500 });
+    }
+    if (msg.includes('quota') || msg.includes('insufficient_quota')) {
+      return NextResponse.json({ error: 'Quota OpenAI dépassé. Rechargez votre crédit sur platform.openai.com' }, { status: 429 });
+    }
     return NextResponse.json({ error: `Erreur analyse IA : ${msg}` }, { status: 500 });
   }
 
@@ -167,6 +173,7 @@ export async function POST(req: NextRequest) {
         template: 'modern',
         content,
         truncated,
+        truncatedAt: truncated ? MAX_CHARS : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }, { status: 201 });
@@ -178,5 +185,5 @@ export async function POST(req: NextRequest) {
 
   await incrementUsage(userId, 'cv_generation');
 
-  return NextResponse.json({ ...cv, truncated }, { status: 201 });
+  return NextResponse.json({ ...cv, truncated, truncatedAt: truncated ? MAX_CHARS : null }, { status: 201 });
 }
