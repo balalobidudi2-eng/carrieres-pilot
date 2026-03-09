@@ -13,7 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [fetchMe]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F7F8FC]">
+    <div className="flex h-screen overflow-hidden bg-[#F7F8FC] dark:bg-[#0D1B2A]">
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <AppHeader />

@@ -19,11 +19,15 @@ export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
-  // Quota check — skip Prisma for demo user
-  const plan = userId === DEMO_USER_ID ? 'PRO' : await getUserPlan(userId).catch(() => 'FREE');
-  const quota = userId === DEMO_USER_ID
+  // Bypass quota for demo + test accounts (no DB on Vercel)
+  const BYPASS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
+  const isBypass = BYPASS.has(userId);
+
+  // Quota check — skip Prisma for bypass users
+  const plan = isBypass ? 'PRO' : await getUserPlan(userId).catch(() => 'FREE');
+  const quota = isBypass
     ? { allowed: true, used: 0, max: 50, remaining: 50 }
-    : await checkQuota(userId, plan, 'ai_matching');
+    : await checkQuota(userId, plan, 'ai_matching').catch(() => ({ allowed: true, used: 0, max: 50, remaining: 50 }));
   if (!quota.allowed) {
     return NextResponse.json(
       { error: `Limite quotidienne de matchings IA atteinte (${quota.max}/jour). Passez au plan supérieur pour continuer.` },
@@ -31,8 +35,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // France Travail API not configured — return mock offers
-  if (!process.env.FRANCE_TRAVAIL_CLIENT_ID) {
+  // France Travail API not configured — return mock offers for all bypass users
+  if (!process.env.FRANCE_TRAVAIL_CLIENT_ID || isBypass) {
     return NextResponse.json(MOCK_OFFERS);
   }
 

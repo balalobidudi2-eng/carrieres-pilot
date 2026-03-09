@@ -54,6 +54,39 @@
   color: var(--color-text);
 }
 
+/* ── Dark mode: override hardcoded Tailwind utilities ──────────────── */
+html.dark .bg-white {
+  background-color: var(--color-card-bg) !important;
+}
+html.dark .bg-\[\#F7F8FC\] {
+  background-color: var(--color-bg) !important;
+}
+html.dark .border-\[\#E2E8F0\] {
+  border-color: var(--color-border) !important;
+}
+html.dark .text-\[\#1E293B\] {
+  color: var(--color-text) !important;
+}
+html.dark .text-\[\#64748B\] {
+  color: var(--color-text-muted) !important;
+}
+html.dark .text-\[\#94A3B8\] {
+  color: #64748B !important;
+}
+html.dark .bg-gray-100 {
+  background-color: #1a2e4a !important;
+}
+html.dark .animate-pulse {
+  background-color: #1a2e4a !important;
+}
+html.dark input:not([type='checkbox']):not([type='radio']):not([type='range']),
+html.dark textarea,
+html.dark select {
+  background-color: var(--color-bg) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
 @layer base {
   * {
     box-sizing: border-box;

@@ -11,11 +11,14 @@ export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
-  // Quota check
-  const plan = await getUserPlan(userId);
-  const quota = userId === DEMO_USER_ID
+  // Bypass quota for demo + test accounts
+  const BYPASS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
+  const isBypass = BYPASS.has(userId);
+
+  const plan = isBypass ? 'PRO' : await getUserPlan(userId).catch(() => 'FREE');
+  const quota = isBypass
     ? { allowed: true, used: 0, max: 100, remaining: 100 }
-    : await checkQuota(userId, plan, 'job_search');
+    : await checkQuota(userId, plan, 'job_search').catch(() => ({ allowed: true, used: 0, max: 100, remaining: 100 }));
   if (!quota.allowed) {
     return NextResponse.json(
       { error: `Limite quotidienne de recherches atteinte (${quota.max}/jour). Passez au plan supérieur pour continuer.` },

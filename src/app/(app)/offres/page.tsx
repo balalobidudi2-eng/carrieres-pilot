@@ -18,6 +18,10 @@ import {
   Square,
   Send,
   X,
+  Bell,
+  TrendingUp,
+  Kanban,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -37,6 +41,13 @@ export default function OffresPage() {
   const [sector, setSector] = useState('Tous');
   const [tab, setTab] = useState<'recommended' | 'all'>('recommended');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // F1 — saved offer IDs (local state, backed by /offers/[id]/save)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  // F3 — alert creation panel
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertKeywords, setAlertKeywords] = useState('');
+  const [alertLocation, setAlertLocation] = useState('');
+  const [alertFreq, setAlertFreq] = useState<'daily' | 'weekly'>('daily');
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -65,12 +76,42 @@ export default function OffresPage() {
     placeholderData: keepPreviousData,
   });
 
+  // F6 — application stats for the mini stats bar
+  const { data: appStats } = useQuery<{ totalApplications: number; responseRate: number; interviewsCount: number; pendingCount: number }>({
+    queryKey: ['application-stats'],
+    queryFn: () => api.get('/applications/stats').then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const saveMutation = useMutation({
     mutationFn: ({ id, saved }: { id: string; saved: boolean }) =>
       saved ? api.delete(`/offers/${id}/save`) : api.post(`/offers/${id}/save`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['offers'] }),
+    onSuccess: (_, vars) => {
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        if (vars.saved) next.delete(vars.id); else next.add(vars.id);
+        return next;
+      });
+      qc.invalidateQueries({ queryKey: ['offers'] });
+    },
     onError: (err: unknown) => {
-      const msg = (err as any)?.response?.data?.error ?? 'Erreur';
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erreur';
+      toast.error(msg);
+    },
+  });
+
+  // F3 — alert creation
+  const alertMutation = useMutation({
+    mutationFn: (data: { keywords: string; location: string; frequency: string }) =>
+      api.post('/offers/alerts', data),
+    onSuccess: () => {
+      toast.success('Alerte créée — vous recevrez des offres par email !');
+      setAlertOpen(false);
+      setAlertKeywords('');
+      setAlertLocation('');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erreur lors de la création';
       toast.error(msg);
     },
   });
@@ -117,10 +158,44 @@ export default function OffresPage() {
       className="space-y-6 max-w-[1100px]"
     >
       {/* Header */}
-      <motion.div variants={fadeInUp}>
-        <h2 className="font-heading text-2xl font-bold text-[#1E293B]">Offres d&apos;emploi</h2>
-        <p className="text-sm text-[#64748B] mt-0.5">Offres matchées par IA selon votre profil</p>
+      <motion.div variants={fadeInUp} className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-heading text-2xl font-bold text-[#1E293B]">Offres d&apos;emploi</h2>
+          <p className="text-sm text-[#64748B] mt-0.5">Offres matchées par IA selon votre profil</p>
+        </div>
+        {/* F2 — link to Kanban */}
+        <a
+          href="/candidatures"
+          className="flex items-center gap-2 px-3 py-2 rounded-btn border border-[#E2E8F0] text-sm font-medium text-[#64748B] hover:border-accent hover:text-accent transition-colors bg-white"
+        >
+          <Kanban size={15} />
+          Mon Kanban
+        </a>
       </motion.div>
+
+      {/* F6 — Mini stats bar */}
+      {appStats && (
+        <motion.div variants={fadeInUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: 'Favoris sauvegardés', value: savedIds.size, icon: '📌', color: '#6B7280' },
+            { label: 'Candidatures totales', value: appStats.totalApplications, icon: '📤', color: '#3B82F6' },
+            { label: 'Entretiens', value: appStats.interviewsCount, icon: '🗓️', color: '#F59E0B' },
+            { label: 'Taux de réponse', value: `${appStats.responseRate}%`, icon: '📊', color: '#10B981' },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-white rounded-card border border-[#E2E8F0] px-4 py-3 flex items-center gap-3"
+              style={{ boxShadow: '0 2px 12px rgba(15,52,96,0.05)' }}
+            >
+              <span className="text-xl">{stat.icon}</span>
+              <div>
+                <p className="font-heading font-bold text-[#1E293B] text-lg leading-none">{stat.value}</p>
+                <p className="text-[11px] text-[#64748B] mt-0.5">{stat.label}</p>
+              </div>
+            </div>
+          ))}
+        </motion.div>
+      )}
 
       {/* Tabs */}
       <motion.div variants={fadeInUp} className="flex gap-1 bg-[#F7F8FC] p-1 rounded-xl w-fit">
@@ -142,6 +217,61 @@ export default function OffresPage() {
             )}
           </button>
         ))}
+      </motion.div>
+
+      {/* F3 — Alert creation panel */}
+      <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: '0 2px 12px rgba(15,52,96,0.05)' }}>
+        <button
+          type="button"
+          onClick={() => setAlertOpen((p) => !p)}
+          className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-[#1E293B] hover:bg-[#F7F8FC] transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Bell size={15} className="text-accent" />
+            Créer une alerte emploi
+          </span>
+          <ChevronDown size={15} className={`text-[#94A3B8] transition-transform ${alertOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {alertOpen && (
+          <div className="px-5 pb-4 space-y-3 border-t border-[#E2E8F0]">
+            <p className="text-xs text-[#64748B] pt-3">Recevez par email les nouvelles offres correspondant à vos critères.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                type="text"
+                value={alertKeywords}
+                onChange={(e) => setAlertKeywords(e.target.value)}
+                placeholder="Ex : Product Designer, React…"
+                className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 bg-white"
+              />
+              <input
+                type="text"
+                value={alertLocation}
+                onChange={(e) => setAlertLocation(e.target.value)}
+                placeholder="Ville (optionnel)"
+                className="px-3 py-2 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 bg-white"
+              />
+              <select
+                value={alertFreq}
+                onChange={(e) => setAlertFreq(e.target.value as 'daily' | 'weekly')}
+                className="px-3 py-2 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent bg-white"
+              >
+                <option value="daily">Chaque jour</option>
+                <option value="weekly">Chaque semaine</option>
+              </select>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={() => alertMutation.mutate({ keywords: alertKeywords, location: alertLocation, frequency: alertFreq })}
+                loading={alertMutation.isPending}
+                disabled={!alertKeywords.trim()}
+              >
+                <Bell size={13} />
+                Créer l&apos;alerte
+              </Button>
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {/* Filters */}
@@ -314,10 +444,14 @@ export default function OffresPage() {
               </Button>
               <button
                 className="ml-auto p-1.5 rounded-lg text-[#94A3B8] hover:text-accent hover:bg-accent/10 transition-colors"
-                onClick={() => saveMutation.mutate({ id: offer.id, saved: false })}
-                title="Sauvegarder"
+                onClick={() => saveMutation.mutate({ id: offer.id, saved: savedIds.has(offer.id) })}
+                title={savedIds.has(offer.id) ? 'Retirer des favoris' : 'Sauvegarder'}
               >
-                <Bookmark size={15} />
+                {savedIds.has(offer.id) ? (
+                  <BookmarkCheck size={15} className="text-accent" />
+                ) : (
+                  <Bookmark size={15} />
+                )}
               </button>
             </div>
           </div>
