@@ -13,7 +13,12 @@ const TEST_PLANS: Record<string, string> = {
 
 function isDbError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return msg.includes("Can't reach database") || msg.includes('P1001') || msg.includes('localhost:5432');
+  return (
+    msg.includes("Can't reach database") ||
+    msg.includes('P1001') || msg.includes('P1002') || msg.includes('P1008') ||
+    msg.includes('P2003') || msg.includes('P2021') ||
+    msg.includes('localhost:5432')
+  );
 }
 
 /** Map quota keys to DailyUsage DB column names */
@@ -49,6 +54,7 @@ function fallbackUsage() {
 
 /** Get or create today's usage record for a user */
 async function getOrCreateUsage(userId: string) {
+  if (userId in TEST_PLANS) return fallbackUsage(); // no DB for test accounts (avoids FK violation)
   const date = todayStr();
   try {
     return await prisma.dailyUsage.upsert({

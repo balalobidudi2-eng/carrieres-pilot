@@ -67,16 +67,18 @@ export async function POST(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
-  // Demo / test users — extract text only, skip OpenAI + Prisma
+  // Demo / test users — skip ALL Prisma calls (quota + DB save)
   const isDemo = DEMO_IDS.has(userId);
 
-  const plan = await getUserPlan(userId);
-  const quota = await checkQuota(userId, plan, 'cv_generation');
-  if (!quota.allowed) {
-    return NextResponse.json(
-      { error: `Quota atteint (${quota.used}/${quota.max} CV générés aujourd'hui). Passez au plan Pro pour plus.` },
-      { status: 429 },
-    );
+  if (!isDemo) {
+    const plan = await getUserPlan(userId);
+    const quota = await checkQuota(userId, plan, 'cv_generation');
+    if (!quota.allowed) {
+      return NextResponse.json(
+        { error: `Quota atteint (${quota.used}/${quota.max} CV générés aujourd'hui). Passez au plan Pro pour plus.` },
+        { status: 429 },
+      );
+    }
   }
 
   let text: string;
@@ -114,6 +116,7 @@ export async function POST(req: NextRequest) {
       userId,
       name: name.slice(0, 100),
       template: 'modern',
+      isDefault: false,
       content: {
         personal: { firstName: '', lastName: '', title: '', email: '', phone: '', city: '', linkedin: '' },
         summary: text.slice(0, 300),
@@ -123,6 +126,7 @@ export async function POST(req: NextRequest) {
         languages: [],
       },
       truncated: false,
+      truncatedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }, { status: 201 });
@@ -171,6 +175,7 @@ export async function POST(req: NextRequest) {
         userId,
         name: name.slice(0, 100),
         template: 'modern',
+        isDefault: false,
         content,
         truncated,
         truncatedAt: truncated ? MAX_CHARS : null,

@@ -7,7 +7,12 @@ const BYPASS_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert'
 
 function isDbConnectionError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return msg.includes("Can't reach database") || msg.includes('P1001') || msg.includes('localhost:5432');
+  return (
+    msg.includes("Can't reach database") ||
+    msg.includes('P1001') || msg.includes('P1002') || msg.includes('P1008') ||
+    msg.includes('P2003') || msg.includes('P2021') ||
+    msg.includes('localhost:5432')
+  );
 }
 
 /** GET /api/offers/alerts — list user's job alerts */
