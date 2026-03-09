@@ -226,7 +226,7 @@ export default function FacturationPage() {
                 <div className="text-right shrink-0">
                   <p className="text-sm font-bold text-[#1E293B]">{formatCents(inv.amount, inv.currency)}</p>
                   <Badge
-                    variant={inv.status === 'paid' ? 'success' : inv.status === 'open' ? 'warning' : 'default'}
+                    variant={inv.status === 'paid' ? 'success' : inv.status === 'open' ? 'warning' : 'neutral'}
                     className="text-[10px]"
                   >
                     {inv.status === 'paid' ? 'Payée' : inv.status === 'open' ? 'En attente' : inv.status ?? 'Inconnue'}

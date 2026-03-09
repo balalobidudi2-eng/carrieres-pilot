@@ -47,8 +47,8 @@ export async function GET(req: NextRequest) {
       description: inv.lines?.data?.[0]?.description ?? null,
     }));
 
-    const nextRenewal = subRes?.current_period_end
-      ? new Date(subRes.current_period_end * 1000).toISOString()
+    const nextRenewal = subRes?.items?.data?.[0]?.current_period_end
+      ? new Date(subRes.items.data[0].current_period_end * 1000).toISOString()
       : null;
     const cancelAtPeriodEnd = subRes?.cancel_at_period_end ?? false;
 

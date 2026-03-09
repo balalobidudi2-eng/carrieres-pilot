@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -39,7 +39,7 @@ import toast from 'react-hot-toast';
 const CONTRACT_TYPES = ['Tous', 'CDI', 'CDD', 'Stage', 'Alternance', 'Freelance'];
 const SECTORS = ['Tous', 'Tech', 'Design', 'Marketing', 'Finance', 'Santé', 'Retail'];
 
-export default function OffresPage() {
+function OffresPageContent() {
   const qc = useQueryClient();
   const { user } = useAuthStore();
   const planConfig = PLANS[user?.plan ?? 'FREE'] ?? PLANS.FREE;
@@ -601,5 +601,13 @@ export default function OffresPage() {
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+export default function OffresPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-40 text-[#94A3B8] text-sm">Chargement…</div>}>
+      <OffresPageContent />
+    </Suspense>
   );
 }
