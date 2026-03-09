@@ -11,6 +11,7 @@ const QUOTA_DB_FIELD: Record<QuotaKey, string> = {
   job_search: 'jobSearch',
   ai_matching: 'aiMatching',
   auto_apply: 'autoApply',
+  interview_questions: 'interviewQuestions',
 };
 
 /** Get today's date string in Europe/Paris timezone */
