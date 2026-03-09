@@ -24,7 +24,36 @@ export interface User {
   notifEmailNewOffer?: boolean;
   notifEmailApplicationStatus?: boolean;
   notifEmailWeeklyDigest?: boolean;
+  adminLevel?: number | null;
+  lastLoginAt?: string;
   createdAt: string;
+}
+
+// ─── Admin ─────────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  plan: Plan;
+  adminLevel: number | null;
+  emailVerified: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+  deletionScheduledAt?: string;
+  _count: { cvs: number; letters: number; applications: number };
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  newUsersLast30Days: number;
+  activeUsersLast30Days: number;
+  planDistribution: { FREE: number; PRO: number; EXPERT: number };
+  totalCVs: number;
+  totalLetters: number;
+  totalApplications: number;
+  totalSearches: number;
 }
 
 export interface AuthTokens {

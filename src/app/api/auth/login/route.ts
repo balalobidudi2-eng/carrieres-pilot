@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword, signAccessToken, createRefreshToken, setRefreshCookie } from '@/lib/auth';
+import { setAdminLevelCookie } from '@/lib/admin-auth';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 
@@ -13,6 +14,13 @@ const TEST_ACCOUNTS: Record<string, { id: string; email: string; firstName: stri
   'test-expert@carrieres-pilot.fr': { id: 'test-expert', email: 'test-expert@carrieres-pilot.fr', firstName: 'Julien', lastName: 'Moreau', plan: 'EXPERT', password: 'test2026' },
 };
 
+// Hardcoded admin test accounts (no database required)
+const ADMIN_ACCOUNTS: Record<string, { id: string; email: string; firstName: string; lastName: string; adminLevel: number; password: string }> = {
+  'admin1@carrieres-pilot.fr': { id: 'admin-l1', email: 'admin1@carrieres-pilot.fr', firstName: 'Admin', lastName: 'Niveau 1', adminLevel: 1, password: 'Admin1#Test2026' },
+  'admin2@carrieres-pilot.fr': { id: 'admin-l2', email: 'admin2@carrieres-pilot.fr', firstName: 'Admin', lastName: 'Niveau 2', adminLevel: 2, password: 'Admin2#Test2026' },
+  'superadmin@carrieres-pilot.fr': { id: 'admin-l3', email: 'superadmin@carrieres-pilot.fr', firstName: 'Super', lastName: 'Admin', adminLevel: 3, password: 'SuperAdmin#2026!' },
+};
+
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json();
 
@@ -20,7 +28,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email et mot de passe requis' }, { status: 400 });
   }
 
-  // Check hardcoded test accounts first (no DB needed)
+  // Check hardcoded admin accounts first (no DB needed)
+  const adminAccount = ADMIN_ACCOUNTS[email.toLowerCase()];
+  if (adminAccount && password === adminAccount.password) {
+    const accessToken = jwt.sign({ sub: adminAccount.id, adminLevel: adminAccount.adminLevel }, JWT_SECRET, { expiresIn: '24h' });
+    const cookieStore = cookies();
+    cookieStore.set('cp_refresh', `admin:${adminAccount.id}`, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/api/auth/refresh',
+      maxAge: 24 * 60 * 60,
+    });
+    cookieStore.set('cp_logged', '1', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60,
+    });
+    setAdminLevelCookie(adminAccount.adminLevel);
+    return NextResponse.json({
+      accessToken,
+      user: { id: adminAccount.id, email: adminAccount.email, firstName: adminAccount.firstName, lastName: adminAccount.lastName, plan: 'FREE', adminLevel: adminAccount.adminLevel, emailVerified: true, onboardingDone: true, skills: [], targetContract: [], targetSectors: [], targetLocations: [] },
+    });
+  }
+
+  // Check hardcoded test accounts (no DB needed)
   const testAccount = TEST_ACCOUNTS[email.toLowerCase()];
   if (testAccount && password === testAccount.password) {
     const accessToken = jwt.sign({ sub: testAccount.id }, JWT_SECRET, { expiresIn: '24h' });
@@ -65,9 +99,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const accessToken = signAccessToken(user.id);
+  const accessToken = user.adminLevel
+    ? jwt.sign({ sub: user.id, adminLevel: user.adminLevel }, JWT_SECRET, { expiresIn: '15m' })
+    : signAccessToken(user.id);
   const refreshToken = await createRefreshToken(user.id);
   setRefreshCookie(refreshToken);
+
+  // Track last login + set admin cookie for real admin users
+  try {
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  } catch { /* ignore if DB unavailable */ }
+
+  if (user.adminLevel) {
+    setAdminLevelCookie(user.adminLevel);
+  }
 
   return NextResponse.json({ accessToken, accountRecovered });
 }

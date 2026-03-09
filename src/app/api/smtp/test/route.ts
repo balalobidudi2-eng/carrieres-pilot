@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import nodemailer from 'nodemailer';
 import { DEMO_USER_ID } from '@/lib/demo-user';
-import { decryptPassword } from '../config/route';
+import { decryptPassword } from '@/lib/smtp';
 
 /** POST /api/smtp/test — sends a test email to the authenticated user */
 export async function POST(req: NextRequest) {

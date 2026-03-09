@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { rotateRefreshToken, setRefreshCookie } from '@/lib/auth';
+import { setAdminLevelCookie } from '@/lib/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { DEMO_USER, DEMO_USER_ID } from '@/lib/demo-user';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-carrieres-pilot-fallback';
+
+// Must mirror ADMIN_ACCOUNTS from login/route.ts
+const ADMIN_USERS: Record<string, { id: string; email: string; firstName: string; lastName: string; adminLevel: number }> = {
+  'admin-l1': { id: 'admin-l1', email: 'admin1@carrieres-pilot.fr', firstName: 'Admin', lastName: 'Niveau 1', adminLevel: 1 },
+  'admin-l2': { id: 'admin-l2', email: 'admin2@carrieres-pilot.fr', firstName: 'Admin', lastName: 'Niveau 2', adminLevel: 2 },
+  'admin-l3': { id: 'admin-l3', email: 'superadmin@carrieres-pilot.fr', firstName: 'Super', lastName: 'Admin', adminLevel: 3 },
+};
 
 // Must mirror TEST_ACCOUNTS from login/route.ts
 const TEST_USERS: Record<string, { id: string; email: string; firstName: string; lastName: string; plan: 'FREE' | 'PRO' | 'EXPERT' }> = {
@@ -54,6 +62,21 @@ export async function POST(_req: NextRequest) {
     }
     const accessToken = jwt.sign({ sub: demoUserId }, JWT_SECRET, { expiresIn: '24h' });
     return NextResponse.json({ accessToken, user: DEMO_USER });
+  }
+
+  // Handle admin account refresh tokens
+  if (oldToken.startsWith('admin:')) {
+    const adminUserId = oldToken.slice(6);
+    const adminUser = ADMIN_USERS[adminUserId];
+    if (!adminUser) {
+      return NextResponse.json({ error: 'Compte admin invalide' }, { status: 401 });
+    }
+    const accessToken = jwt.sign({ sub: adminUserId, adminLevel: adminUser.adminLevel }, JWT_SECRET, { expiresIn: '24h' });
+    setAdminLevelCookie(adminUser.adminLevel);
+    return NextResponse.json({
+      accessToken,
+      user: { ...adminUser, plan: 'FREE', emailVerified: true, onboardingDone: true, skills: [], targetContract: [], targetSectors: [], targetLocations: [] },
+    });
   }
 
   // Handle test account refresh tokens — no database needed
