@@ -20,6 +20,7 @@ import {
   Sun,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/axios';
@@ -41,9 +42,13 @@ type PasswordForm = z.infer<typeof passwordSchema>;
 
 export default function ParametresPage() {
   const { user, logout } = useAuthStore();
+  const { theme, setTheme } = useTheme();
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteStep, setDeleteStep] = useState<'idle' | 'reason' | 'confirm'>('idle');
+  const [deleteReason, setDeleteReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
 
   const [notifications, setNotifications] = useState({
     emailNewOffer: user?.notifEmailNewOffer ?? true,
@@ -52,9 +57,6 @@ export default function ParametresPage() {
     pushNewOffer: false,
     pushApplicationStatus: true,
   });
-
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
-  const [language, setLanguage] = useState('fr');
 
   const {
     register,
@@ -73,7 +75,12 @@ export default function ParametresPage() {
       toast.success('Mot de passe mis à jour !');
       reset();
     },
-    onError: () => toast.error('Mot de passe actuel incorrect'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : null)
+        ?? 'Erreur lors du changement de mot de passe';
+      toast.error(msg);
+    },
   });
 
   const notifMutation = useMutation({
@@ -83,15 +90,15 @@ export default function ParametresPage() {
   });
 
   const deleteAccountMutation = useMutation({
-    mutationFn: () => api.delete('/users/me'),
+    mutationFn: (reason: string) => api.delete('/users/me', { data: { reason } }),
     onSuccess: () => {
-      toast.success('Compte supprimé');
+      toast.success('Votre compte sera supprimé dans 30 jours. Reconnectez-vous pour annuler.');
       logout();
     },
     onError: () => toast.error('Erreur lors de la suppression'),
   });
 
-  const isDeleteReady = deleteConfirm === user?.email;
+  const isDeleteReady = deleteConfirm === 'irréversible';
 
   return (
     <motion.div
@@ -256,17 +263,6 @@ export default function ParametresPage() {
               ))}
             </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-[#1E293B] mb-2">Langue</p>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="border border-[#E2E8F0] rounded-btn px-3 py-2 text-sm text-[#1E293B] focus:outline-none focus:border-accent"
-            >
-              <option value="fr">🇫🇷 Français</option>
-              <option value="en">🇬🇧 English</option>
-            </select>
-          </div>
         </div>
       </motion.section>
 
@@ -298,24 +294,97 @@ export default function ParametresPage() {
             <div>
               <p className="text-sm font-medium text-red-600">Supprimer mon compte</p>
               <p className="text-xs text-[#94A3B8]">
-                Action irréversible. Toutes vos données seront effacées immédiatement.
+                Votre compte sera mis en attente de suppression pendant 30 jours. Reconnectez-vous avant ce délai pour l&apos;annuler.
               </p>
             </div>
-            <Input
-              placeholder={`Tapez "${user?.email}" pour confirmer`}
-              value={deleteConfirm}
-              onChange={(e) => setDeleteConfirm(e.target.value)}
-            />
-            <Button
-              variant="danger"
-              size="sm"
-              disabled={!isDeleteReady}
-              loading={deleteAccountMutation.isPending}
-              onClick={() => deleteAccountMutation.mutate()}
-            >
-              <Trash2 size={14} />
-              Supprimer définitivement mon compte
-            </Button>
+
+            {deleteStep === 'idle' && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setDeleteStep('reason')}
+              >
+                <Trash2 size={14} />
+                Supprimer mon compte
+              </Button>
+            )}
+
+            {deleteStep === 'reason' && (
+              <div className="space-y-3 border border-red-100 rounded-card p-4 bg-red-50/50">
+                <p className="text-sm font-semibold text-[#1E293B]">Pourquoi souhaitez-vous supprimer votre compte ?</p>
+                <div className="space-y-2">
+                  {[
+                    'Je n\'utilise plus le service',
+                    'J\'ai trouvé un emploi',
+                    'Le service ne me convient pas',
+                    'Problème de confidentialité',
+                    'Autre',
+                  ].map((r) => (
+                    <label key={r} className="flex items-center gap-2 text-sm text-[#1E293B] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="deleteReason"
+                        value={r}
+                        checked={deleteReason === r}
+                        onChange={() => setDeleteReason(r)}
+                        className="accent-accent"
+                      />
+                      {r}
+                    </label>
+                  ))}
+                </div>
+                {deleteReason === 'Autre' && (
+                  <textarea
+                    placeholder="Précisez votre raison…"
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    rows={2}
+                    className="w-full p-2.5 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent resize-none"
+                  />
+                )}
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" variant="outline" onClick={() => { setDeleteStep('idle'); setDeleteReason(''); setCustomReason(''); }}>
+                    Annuler
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={!deleteReason || (deleteReason === 'Autre' && !customReason.trim())}
+                    onClick={() => setDeleteStep('confirm')}
+                  >
+                    Continuer
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {deleteStep === 'confirm' && (
+              <div className="space-y-3 border border-red-200 rounded-card p-4 bg-red-50/50">
+                <p className="text-sm text-[#1E293B]">
+                  Tapez <strong>irréversible</strong> pour confirmer la suppression dans 30 jours.
+                </p>
+                <Input
+                  placeholder='Tapez "irréversible" pour confirmer'
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { setDeleteStep('idle'); setDeleteConfirm(''); setDeleteReason(''); setCustomReason(''); }}>
+                    Annuler
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={!isDeleteReady}
+                    loading={deleteAccountMutation.isPending}
+                    onClick={() => deleteAccountMutation.mutate(deleteReason === 'Autre' ? customReason : deleteReason)}
+                  >
+                    <Trash2 size={14} />
+                    Confirmer la suppression
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </motion.section>

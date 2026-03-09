@@ -27,6 +27,33 @@
   --transition: all 0.25s ease;
 }
 
+/* ── Dark mode overrides ──────────────────────────────────── */
+.dark {
+  --color-bg: #0D1B2A;
+  --color-bg-dark: #060D15;
+  --color-text: #E2E8F0;
+  --color-text-muted: #94A3B8;
+  --color-white: #1E293B;
+  --color-border: #1E3350;
+  --color-card-bg: #112240;
+  --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 8px 40px rgba(124, 58, 237, 0.25);
+}
+
+.dark body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  color: var(--color-text);
+}
+
 @layer base {
   * {
     box-sizing: border-box;

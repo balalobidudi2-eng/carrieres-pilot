@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { requireAuth, revokeUserTokens, clearAuthCookies } from '@/lib/auth';
 import { DEMO_USER, DEMO_USER_ID } from '@/lib/demo-user';
 
+const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
+
 // Must mirror TEST_ACCOUNTS from login/route.ts
 const TEST_USERS: Record<string, { id: string; email: string; firstName: string; lastName: string; plan: 'FREE' | 'PRO' | 'EXPERT' }> = {
   'test-free': { id: 'test-free', email: 'test-free@carrieres-pilot.fr', firstName: 'Alex', lastName: 'Dupont', plan: 'FREE' },
@@ -73,16 +75,36 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-/** DELETE /api/users/me — delete account */
+/** DELETE /api/users/me — soft-delete account (30-day grace period) */
 export async function DELETE(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
-  try {
-    await revokeUserTokens(userId);
-    await prisma.user.delete({ where: { id: userId } });
+  // Demo / test — just log out, no real deletion
+  if (DEMO_IDS.has(userId)) {
     clearAuthCookies();
     return NextResponse.json({ ok: true });
+  }
+
+  let reason: string | undefined;
+  try {
+    const body = await req.json();
+    reason = body?.reason ?? undefined;
+  } catch { /* body may be empty */ }
+
+  const deletionScheduledAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  try {
+    await revokeUserTokens(userId);
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        deletionScheduledAt,
+        deletionReason: reason ?? null,
+      },
+    });
+    clearAuthCookies();
+    return NextResponse.json({ ok: true, deletionScheduledAt });
   } catch (err: unknown) {
     console.error('[DELETE /api/users/me]', err);
     const message = err instanceof Error ? err.message : 'Erreur serveur';

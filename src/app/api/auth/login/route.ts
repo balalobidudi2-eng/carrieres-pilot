@@ -50,9 +50,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email ou mot de passe incorrect' }, { status: 401 });
   }
 
+  // 30-day account recovery: if deletion was scheduled and hasn't passed, cancel it
+  let accountRecovered = false;
+  if (user.deletionScheduledAt) {
+    if (user.deletionScheduledAt > new Date()) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { deletionScheduledAt: null, deletionReason: null },
+      });
+      accountRecovered = true;
+    } else {
+      // Grace period expired — reject login
+      return NextResponse.json({ error: 'Ce compte a été supprimé. Contactez le support si nécessaire.' }, { status: 403 });
+    }
+  }
+
   const accessToken = signAccessToken(user.id);
   const refreshToken = await createRefreshToken(user.id);
   setRefreshCookie(refreshToken);
 
-  return NextResponse.json({ accessToken });
+  return NextResponse.json({ accessToken, accountRecovered });
 }

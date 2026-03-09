@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api, setAccessToken } from '@/lib/axios';
 import type { User } from '@/types';
+import toast from 'react-hot-toast';
 
 interface AuthState {
   user: User | null;
@@ -25,6 +26,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const res = await api.post('/auth/login', { email, password });
       setAccessToken(res.data.accessToken);
+      if (res.data.accountRecovered) {
+        toast.success('Votre demande de suppression a été annulée. Bienvenue de retour !', { duration: 6000 });
+      }
       const me = await api.get('/users/me');
       set({ user: me.data, isLoading: false });
       window.location.href = '/dashboard';
