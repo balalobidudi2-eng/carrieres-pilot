@@ -31,7 +31,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
       const me = await api.get('/users/me');
       set({ user: me.data, isLoading: false });
-      window.location.href = '/dashboard';
+      window.location.href = me.data?.adminLevel ? '/admin/dashboard' : '/dashboard';
     } catch (error) {
       set({ isLoading: false });
       throw error;

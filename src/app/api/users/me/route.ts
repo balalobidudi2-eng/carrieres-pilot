@@ -12,6 +12,13 @@ const TEST_USERS: Record<string, { id: string; email: string; firstName: string;
   'test-expert': { id: 'test-expert', email: 'test-expert@carrieres-pilot.fr', firstName: 'Julien', lastName: 'Moreau', plan: 'EXPERT' },
 };
 
+// Must mirror ADMIN_ACCOUNTS from login/route.ts
+const ADMIN_USERS: Record<string, { id: string; email: string; firstName: string; lastName: string; adminLevel: number }> = {
+  'admin-l1': { id: 'admin-l1', email: 'admin1@carrieres-pilot.fr', firstName: 'Admin', lastName: 'Niveau 1', adminLevel: 1 },
+  'admin-l2': { id: 'admin-l2', email: 'admin2@carrieres-pilot.fr', firstName: 'Admin', lastName: 'Niveau 2', adminLevel: 2 },
+  'admin-l3': { id: 'admin-l3', email: 'superadmin@carrieres-pilot.fr', firstName: 'Super', lastName: 'Admin', adminLevel: 3 },
+};
+
 /** GET /api/users/me — current user profile */
 export async function GET(req: NextRequest) {
   let userId: string;
@@ -26,6 +33,12 @@ export async function GET(req: NextRequest) {
   const testUser = TEST_USERS[userId];
   if (testUser) {
     return NextResponse.json({ ...testUser, avatar: null, phone: null, linkedinUrl: null, currentTitle: null, location: null, bio: null, targetSalary: null, targetContract: [], targetSectors: [], targetLocations: [], skills: [], emailVerified: true, onboardingDone: false, createdAt: new Date().toISOString() });
+  }
+
+  // Return admin account user immediately without hitting DB
+  const adminUser = ADMIN_USERS[userId];
+  if (adminUser) {
+    return NextResponse.json({ ...adminUser, plan: 'FREE' as const, avatar: null, phone: null, linkedinUrl: null, currentTitle: null, location: null, bio: null, targetSalary: null, targetContract: [], targetSectors: [], targetLocations: [], skills: [], emailVerified: true, onboardingDone: true, createdAt: new Date().toISOString() });
   }
 
   try {
