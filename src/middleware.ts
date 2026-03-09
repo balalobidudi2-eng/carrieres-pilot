@@ -8,10 +8,9 @@ const AUTH_ROUTES = ['/connexion', '/inscription'];
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Check for an auth indicator cookie set by server after login
-  // (httpOnly — not readable by JS, but we check a non-sensitive "logged" flag)
-  // cp_mock is a dev-only fallback when backend is not configured
-  const isLoggedIn = req.cookies.has('cp_logged') || req.cookies.has('cp_mock');
+  // Check for auth indicator cookie set by server after login
+  // (httpOnly refresh token is not readable, so we check a non-sensitive "logged" flag)
+  const isLoggedIn = req.cookies.has('cp_logged');
 
   // Protect app routes
   if (PROTECTED.some((r) => pathname === r || pathname.startsWith(r + '/')) && !isLoggedIn) {

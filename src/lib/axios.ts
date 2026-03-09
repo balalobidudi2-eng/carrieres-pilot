@@ -1,9 +1,7 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-
 export const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: '/api',
   withCredentials: true, // send httpOnly refresh cookie
 });
 
@@ -24,16 +22,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Flag to prevent refresh loops
+let isRefreshing = false;
+
 // Response interceptor — refresh on 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
+    // Don't retry logout or refresh calls themselves
+    const isAuthRoute = original.url?.includes('/auth/logout') || original.url?.includes('/auth/refresh');
+    if (error.response?.status === 401 && !original._retry && !isAuthRoute && !isRefreshing) {
       original._retry = true;
+      isRefreshing = true;
       try {
         const res = await axios.post(
-          `${API_URL}/api/auth/refresh`,
+          '/api/auth/refresh',
           {},
           { withCredentials: true },
         );
@@ -43,8 +47,13 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         setAccessToken(null);
-        window.location.href = '/connexion';
+        // Only redirect if we're not already on a public page
+        if (!window.location.pathname.startsWith('/connexion') && !window.location.pathname.startsWith('/inscription')) {
+          window.location.href = '/connexion';
+        }
         return Promise.reject(error);
+      } finally {
+        isRefreshing = false;
       }
     }
     return Promise.reject(error);

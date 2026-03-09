@@ -13,9 +13,6 @@ import { Input } from '@/components/ui/Input';
 import { fadeInUp, staggerContainer } from '@/lib/animations';
 import { useAuthStore } from '@/stores/authStore';
 
-const DEMO_EMAIL = 'demo@carrieres-pilot.fr';
-const DEMO_PASSWORD = 'demo1234';
-
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
   password: z.string().min(8, 'Mot de passe trop court'),
@@ -26,7 +23,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function ConnexionPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
-  const { login, register: registerUser, isLoading } = useAuthStore();
+  const { login, loginDemo, register: registerUser, isLoading } = useAuthStore();
 
   const {
     register,
@@ -42,18 +39,12 @@ export default function ConnexionPage() {
     }
   };
 
-  const loginDemo = async () => {
+  const handleDemoLogin = async () => {
     setDemoLoading(true);
     try {
-      // Try login first; if the account doesn’t exist yet, register it
-      await login(DEMO_EMAIL, DEMO_PASSWORD);
+      await loginDemo();
     } catch {
-      try {
-        await registerUser('Sophie', 'Martin', DEMO_EMAIL, DEMO_PASSWORD);
-      } catch (err: unknown) {
-        // Account already exists — password mismatch or other error, just notify
-        toast.error('Impossible de charger le compte démo');
-      }
+      toast.error('Impossible de charger le compte démo');
     } finally {
       setDemoLoading(false);
     }
@@ -98,7 +89,7 @@ export default function ConnexionPage() {
           {/* Demo account button */}
           <button
             type="button"
-            onClick={loginDemo}
+            onClick={handleDemoLogin}
             disabled={demoLoading || isLoading}
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/30 rounded-btn px-4 py-3 text-sm font-semibold text-accent hover:from-accent/20 hover:to-primary/20 transition-all mb-3 disabled:opacity-60"
           >

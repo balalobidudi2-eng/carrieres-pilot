@@ -27,22 +27,19 @@ import { staggerContainer, fadeInUp } from '@/lib/animations';
 import toast from 'react-hot-toast';
 
 const schema = z.object({
-  name: z.string().min(2, 'Nom requis'),
+  firstName: z.string().min(1, 'Prénom requis'),
+  lastName: z.string().min(1, 'Nom requis'),
   email: z.string().email('Email invalide'),
   phone: z.string().optional(),
-  city: z.string().optional(),
-  title: z.string().optional(),
+  location: z.string().optional(),
+  currentTitle: z.string().optional(),
   bio: z.string().max(500).optional(),
-  linkedin: z.string().url('URL invalide').optional().or(z.literal('')),
-  github: z.string().url('URL invalide').optional().or(z.literal('')),
-  portfolio: z.string().url('URL invalide').optional().or(z.literal('')),
-  targetSalaryMin: z.coerce.number().optional(),
-  targetSalaryMax: z.coerce.number().optional(),
-  targetContracts: z.array(z.string()).optional(),
+  linkedinUrl: z.string().url('URL invalide').optional().or(z.literal('')),
+  targetSalary: z.string().optional(),
+  targetContract: z.array(z.string()).optional(),
   targetLocations: z.array(z.string()).optional(),
   targetSectors: z.array(z.string()).optional(),
   skills: z.array(z.string()).optional(),
-  openToRemote: z.boolean().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -105,23 +102,20 @@ export default function ProfilPage() {
     formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      name: profile?.name ?? '',
+    values: {
+      firstName: profile?.firstName ?? '',
+      lastName: profile?.lastName ?? '',
       email: profile?.email ?? '',
       phone: profile?.phone ?? '',
-      city: profile?.city ?? '',
-      title: profile?.title ?? '',
+      location: profile?.location ?? '',
+      currentTitle: profile?.currentTitle ?? '',
       bio: profile?.bio ?? '',
-      linkedin: profile?.linkedin ?? '',
-      github: profile?.github ?? '',
-      portfolio: profile?.portfolio ?? '',
-      targetSalaryMin: profile?.targetSalaryMin,
-      targetSalaryMax: profile?.targetSalaryMax,
-      targetContracts: profile?.targetContracts ?? [],
+      linkedinUrl: profile?.linkedinUrl ?? '',
+      targetSalary: profile?.targetSalary ?? '',
+      targetContract: profile?.targetContract ?? [],
       targetLocations: profile?.targetLocations ?? [],
       targetSectors: profile?.targetSectors ?? [],
       skills: profile?.skills ?? [],
-      openToRemote: profile?.openToRemote ?? false,
     },
   });
 
@@ -132,10 +126,15 @@ export default function ProfilPage() {
       qc.invalidateQueries({ queryKey: ['me'] });
       toast.success('Profil mis à jour !');
     },
-    onError: () => toast.error('Erreur lors de la sauvegarde'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : null)
+        ?? 'Erreur lors de la sauvegarde';
+      toast.error(msg);
+    },
   });
 
-  const targetContracts = watch('targetContracts') ?? [];
+  const targetContract = watch('targetContract') ?? [];
   const targetSectors = watch('targetSectors') ?? [];
 
   const TABS = [
@@ -151,14 +150,14 @@ export default function ProfilPage() {
         {/* Avatar */}
         <div className="relative">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-2xl font-extrabold font-heading shrink-0 uppercase">
-            {(user?.name ?? 'U').slice(0, 1)}
+            {(user?.firstName ?? 'U').slice(0, 1)}
           </div>
           <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full border border-[#E2E8F0] flex items-center justify-center hover:bg-accent hover:text-white hover:border-transparent transition-colors shadow-sm">
             <Camera size={11} />
           </button>
         </div>
         <div>
-          <h2 className="font-heading text-2xl font-bold text-[#1E293B]">{user?.name ?? 'Mon profil'}</h2>
+          <h2 className="font-heading text-2xl font-bold text-[#1E293B]">{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Mon profil'}</h2>
           <p className="text-sm text-[#64748B] mt-0.5">{user?.email}</p>
           {user?.plan && (
             <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -199,11 +198,12 @@ export default function ProfilPage() {
             <h3 className="font-heading font-semibold text-[#1E293B] text-base border-b border-[#E2E8F0] pb-3">Informations personnelles</h3>
 
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Nom complet" {...register('name')} error={errors.name?.message} />
+              <Input label="Prénom" {...register('firstName')} error={errors.firstName?.message} />
+              <Input label="Nom" {...register('lastName')} error={errors.lastName?.message} />
               <Input label="Email" type="email" {...register('email')} error={errors.email?.message} />
               <Input label="Téléphone" {...register('phone')} placeholder="+33 6 00 00 00 00" />
-              <Input label="Ville" {...register('city')} placeholder="Paris, France" leftIcon={<MapPin size={14} />} />
-              <Input label="Titre / Poste" {...register('title')} placeholder="ex: UX Designer Senior" className="col-span-2" />
+              <Input label="Ville" {...register('location')} placeholder="Paris, France" leftIcon={<MapPin size={14} />} />
+              <Input label="Titre / Poste" {...register('currentTitle')} placeholder="ex: UX Designer Senior" />
             </div>
 
             <div>
@@ -219,9 +219,7 @@ export default function ProfilPage() {
 
             <h3 className="font-heading font-semibold text-[#1E293B] text-base border-b border-[#E2E8F0] pb-3 pt-2">Liens professionnels</h3>
             <div className="grid grid-cols-1 gap-3">
-              <Input label="LinkedIn" {...register('linkedin')} error={errors.linkedin?.message} placeholder="https://linkedin.com/in/votre-profil" leftIcon={<Globe size={14} />} />
-              <Input label="GitHub" {...register('github')} error={errors.github?.message} placeholder="https://github.com/votre-profil" />
-              <Input label="Portfolio" {...register('portfolio')} error={errors.portfolio?.message} placeholder="https://votre-portfolio.com" />
+              <Input label="LinkedIn" {...register('linkedinUrl')} error={errors.linkedinUrl?.message} placeholder="https://linkedin.com/in/votre-profil" leftIcon={<Globe size={14} />} />
             </div>
           </motion.div>
         )}
@@ -233,21 +231,8 @@ export default function ProfilPage() {
 
             {/* Salary */}
             <div>
-              <p className="text-sm font-semibold text-[#1E293B] mb-2">Salaire cible (€/an)</p>
-              <div className="flex items-center gap-3">
-                <Input label="Minimum" type="number" {...register('targetSalaryMin')} placeholder="40 000" />
-                <span className="mt-6 text-[#94A3B8]">—</span>
-                <Input label="Maximum" type="number" {...register('targetSalaryMax')} placeholder="60 000" />
-              </div>
-            </div>
-
-            {/* Remote */}
-            <div className="flex items-center gap-3">
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" {...register('openToRemote')} className="sr-only peer" />
-                <div className="w-10 h-5 bg-[#E2E8F0] peer-focus:outline-none rounded-full peer peer-checked:bg-accent transition-all after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
-              </label>
-              <span className="text-sm font-medium text-[#1E293B]">Ouvert au télétravail</span>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Salaire cible</p>
+              <Input label="Salaire souhaité" {...register('targetSalary')} placeholder="ex: 45-60k€/an" />
             </div>
 
             {/* Contract types */}
@@ -259,11 +244,11 @@ export default function ProfilPage() {
                     key={c}
                     type="button"
                     onClick={() => {
-                      const curr = targetContracts;
-                      setValue('targetContracts', curr.includes(c) ? curr.filter((x) => x !== c) : [...curr, c], { shouldDirty: true });
+                      const curr = targetContract;
+                      setValue('targetContract', curr.includes(c) ? curr.filter((x) => x !== c) : [...curr, c], { shouldDirty: true });
                     }}
                     className={`px-3 py-1.5 rounded-btn text-xs font-semibold border transition-all ${
-                      targetContracts.includes(c) ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-[#F7F8FC] border-[#E2E8F0] text-[#64748B] hover:border-accent/30'
+                      targetContract.includes(c) ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-[#F7F8FC] border-[#E2E8F0] text-[#64748B] hover:border-accent/30'
                     }`}
                   >
                     {c}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
@@ -12,12 +12,13 @@ import {
   Eye,
   MoreHorizontal,
   FileText,
+  Upload,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
+import { Input, Textarea } from '@/components/ui/Input';
 import { CVEditor } from '@/components/cv/CVEditor';
 import { api } from '@/lib/axios';
 import { staggerContainer, fadeInUp } from '@/lib/animations';
@@ -26,6 +27,11 @@ import type { CV } from '@/types';
 export default function CVPage() {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importName, setImportName] = useState('');
+  const [importText, setImportText] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedCV, setSelectedCV] = useState<CV | null>(null);
   const [newCVName, setNewCVName] = useState('');
 
@@ -43,7 +49,37 @@ export default function CVPage() {
       setSelectedCV(res.data);
       toast.success('CV créé avec succès !');
     },
-    onError: () => toast.error('Erreur lors de la création'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : null)
+        ?? 'Erreur lors de la création';
+      toast.error(msg);
+    },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: (data: { name: string; text: string; file?: File | null }) => {
+      if (data.file) {
+        const form = new FormData();
+        form.append('file', data.file);
+        form.append('name', data.name);
+        return api.post('/cv/import', form).then((r) => r.data);
+      }
+      return api.post('/cv/import', { name: data.name, text: data.text }).then((r) => r.data);
+    },
+    onSuccess: (cv: CV) => {
+      qc.invalidateQueries({ queryKey: ['cvs'] });
+      setImportOpen(false);
+      setImportText('');
+      setImportName('');      setImportFile(null);      setSelectedCV(cv);
+      toast.success('CV importé et structuré par IA !');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : null)
+        ?? "Erreur lors de l'import";
+      toast.error(msg);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -55,14 +91,10 @@ export default function CVPage() {
     },
   });
 
-  const generatePDFMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/cv/${id}/generate-pdf`),
-    onSuccess: (res) => {
-      window.open(res.data.pdfUrl, '_blank');
-      toast.success('PDF généré !');
-    },
-    onError: () => toast.error('Erreur génération PDF'),
-  });
+  const handleDownloadPDF = (cv: CV) => {
+    setSelectedCV(cv);
+    setTimeout(() => toast('💡 Utilisez Imprimer (Ctrl+P) dans l\'éditeur pour exporter en PDF', { duration: 5000 }), 400);
+  };
 
   if (selectedCV) {
     return (
@@ -90,10 +122,16 @@ export default function CVPage() {
           <h2 className="font-heading text-2xl font-bold text-[#1E293B]">Mes CV</h2>
           <p className="text-sm text-[#64748B] mt-0.5">Créez et gérez vos CV professionnels</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus size={16} />
-          Nouveau CV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>
+            <Upload size={16} />
+            Importer
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus size={16} />
+            Nouveau CV
+          </Button>
+        </div>
       </motion.div>
 
       {/* CV Grid */}
@@ -179,7 +217,7 @@ export default function CVPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => generatePDFMutation.mutate(cv.id)}
+                    onClick={() => handleDownloadPDF(cv)}
                     className="p-1.5 rounded-lg text-[#64748B] hover:bg-[#F7F8FC] hover:text-accent transition-colors"
                     title="Télécharger PDF"
                   >
@@ -217,19 +255,99 @@ export default function CVPage() {
               variant="secondary"
               onClick={() => createMutation.mutate(newCVName)}
               loading={createMutation.isPending}
+              disabled={!newCVName.trim()}
             >
               <FileText size={15} />
               Créer depuis zéro
             </Button>
             <Button
               fullWidth
-              onClick={() => createMutation.mutate(newCVName)}
-              loading={createMutation.isPending}
+              onClick={() => {
+                if (!newCVName.trim()) return;
+                setCreateOpen(false);
+                setImportName(newCVName);
+                setImportOpen(true);
+              }}
             >
               <Sparkles size={15} />
-              Générer avec l&apos;IA
+              Importer &amp; enrichir IA
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Import modal */}
+      <Modal open={importOpen} onClose={() => { setImportOpen(false); setImportFile(null); setImportText(''); }} title="Importer mon CV">
+        <div className="space-y-4">
+          <p className="text-sm text-[#64748B]">
+            S\u00e9lectionnez un fichier <strong>.pdf</strong>, <strong>.docx</strong> ou <strong>.txt</strong>,
+            ou collez le texte ci-dessous. L\u2019IA va structurer votre CV automatiquement.
+          </p>
+
+          {/* File picker */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setImportFile(f);
+              if (f && !importName) setImportName(f.name.replace(/\.[^/.]+$/, ''));
+              if (f?.name.endsWith('.txt')) {
+                const reader = new FileReader();
+                reader.onload = (ev) => setImportText((ev.target?.result as string) ?? '');
+                reader.readAsText(f, 'UTF-8');
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full border-2 border-dashed border-[#E2E8F0] hover:border-accent rounded-btn p-5 text-center transition-colors cursor-pointer group"
+          >
+            {importFile ? (
+              <div className="flex items-center justify-center gap-2 text-accent font-medium text-sm">
+                <FileText size={18} />
+                <span>{importFile.name}</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-[#94A3B8] group-hover:text-accent transition-colors">
+                <Upload size={24} />
+                <span className="text-sm font-medium">Cliquez pour choisir un fichier</span>
+                <span className="text-xs">.pdf, .docx, .txt</span>
+              </div>
+            )}
+          </button>
+
+          <Input
+            label="Nom du CV"
+            placeholder="Ex: CV import\u00e9 2025"
+            value={importName}
+            onChange={(e) => setImportName(e.target.value)}
+            required
+          />
+
+          {/* Paste fallback */}
+          {!importFile && (
+            <Textarea
+              label="Ou collez le texte de votre CV"
+              placeholder="Collez ici le texte de votre CV (exp\u00e9riences, formation, comp\u00e9tences...)"
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              rows={6}
+            />
+          )}
+
+          <Button
+            fullWidth
+            onClick={() => importMutation.mutate({ name: importName || 'CV import\u00e9', text: importText, file: importFile })}
+            loading={importMutation.isPending}
+            disabled={!importFile && !importText.trim()}
+          >
+            <Sparkles size={15} />
+            {importMutation.isPending ? 'Analyse en cours...' : 'Analyser et importer'}
+          </Button>
         </div>
       </Modal>
     </motion.div>
@@ -237,6 +355,7 @@ export default function CVPage() {
 }
 
 const defaultContent = {
+  personal: {},
   summary: '',
   experiences: [],
   education: [],

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
   MapPin,
@@ -14,6 +14,10 @@ import {
   Sparkles,
   Filter,
   SlidersHorizontal,
+  CheckSquare,
+  Square,
+  Send,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -32,6 +36,23 @@ export default function OffresPage() {
   const [contract, setContract] = useState('Tous');
   const [sector, setSector] = useState('Tous');
   const [tab, setTab] = useState<'recommended' | 'all'>('recommended');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (offers: JobOffer[]) => {
+    if (selectedIds.size === offers.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(offers.map((o) => o.id)));
+    }
+  };
 
   const { data: offers = [], isLoading } = useQuery<JobOffer[]>({
     queryKey: ['offers', tab, query, contract, sector],
@@ -48,7 +69,10 @@ export default function OffresPage() {
     mutationFn: ({ id, saved }: { id: string; saved: boolean }) =>
       saved ? api.delete(`/offers/${id}/save`) : api.post(`/offers/${id}/save`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['offers'] }),
-    onError: () => toast.error('Erreur'),
+    onError: (err: unknown) => {
+      const msg = (err as any)?.response?.data?.error ?? 'Erreur';
+      toast.error(msg);
+    },
   });
 
   const applyMutation = useMutation({
@@ -60,7 +84,29 @@ export default function OffresPage() {
         status: 'TO_SEND',
       }),
     onSuccess: () => toast.success('Candidature créée ! Retrouvez-la dans votre Kanban.'),
-    onError: () => toast.error('Erreur lors de la création'),
+    onError: (err: unknown) => {
+      const msg = (err as any)?.response?.data?.error ?? 'Erreur lors de la création';
+      toast.error(msg);
+    },
+  });
+
+  const batchApplyMutation = useMutation({
+    mutationFn: (offersList: JobOffer[]) =>
+      api.post('/applications/batch', {
+        applications: offersList.map((o) => ({
+          company: o.company,
+          jobTitle: o.title,
+          jobOfferId: o.id,
+        })),
+      }),
+    onSuccess: (_, vars) => {
+      toast.success(`${vars.length} candidature(s) créée(s) !`);
+      setSelectedIds(new Set());
+    },
+    onError: (err: unknown) => {
+      const msg = (err as any)?.response?.data?.error ?? 'Erreur lors de la création batch';
+      toast.error(msg);
+    },
   });
 
   return (
@@ -112,7 +158,7 @@ export default function OffresPage() {
         </div>
 
         {/* Contract filter */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {CONTRACT_TYPES.map((c) => (
             <button
               key={c}
@@ -125,7 +171,41 @@ export default function OffresPage() {
             </button>
           ))}
         </div>
+
+        {/* Sector filter */}
+        <div className="flex gap-1.5 flex-wrap">
+          {SECTORS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSector(s)}
+              className={`px-3 py-2 rounded-btn text-xs font-semibold transition-all ${
+                sector === s ? 'bg-primary text-white' : 'bg-white border border-[#E2E8F0] text-[#64748B] hover:border-primary/40'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </motion.div>
+
+      {/* Select all + count */}
+      {offers.length > 0 && (
+        <motion.div variants={fadeInUp} className="flex items-center gap-3">
+          <button
+            onClick={() => toggleSelectAll(offers)}
+            className="flex items-center gap-2 text-sm font-medium text-[#64748B] hover:text-accent transition-colors"
+          >
+            {selectedIds.size === offers.length && offers.length > 0 ? (
+              <CheckSquare size={18} className="text-accent" />
+            ) : (
+              <Square size={18} />
+            )}
+            {selectedIds.size > 0
+              ? `${selectedIds.size} sélectionnée(s)`
+              : 'Tout sélectionner'}
+          </button>
+        </motion.div>
+      )}
 
       {/* Offers grid */}
       {isLoading ? (
@@ -134,15 +214,36 @@ export default function OffresPage() {
             <div key={i} className="h-28 bg-gray-100 animate-pulse rounded-card" />
           ))}
         </div>
-      ) : (offresOrMock(offers)).map((offer) => (
+      ) : offers.length === 0 ? (
+        <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-12 text-center" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+          <Search size={40} className="mx-auto text-[#CBD5E1] mb-3" />
+          <p className="font-heading font-semibold text-[#1E293B]">Aucune offre trouvée</p>
+          <p className="text-sm text-[#64748B] mt-1">Modifiez vos critères de recherche ou complétez votre profil pour de meilleures recommandations.</p>
+        </motion.div>
+      ) : offers.map((offer) => (
         <motion.div
           key={offer.id}
           variants={fadeInUp}
           whileHover={{ y: -2 }}
           transition={{ duration: 0.2 }}
-          className="bg-white rounded-card border border-[#E2E8F0] p-5 flex items-start gap-4 hover:border-accent/30"
+          className={`bg-white rounded-card border p-5 flex items-start gap-4 hover:border-accent/30 ${
+            selectedIds.has(offer.id) ? 'border-accent/50 ring-2 ring-accent/10' : 'border-[#E2E8F0]'
+          }`}
           style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}
         >
+          {/* Checkbox */}
+          <button
+            onClick={() => toggleSelect(offer.id)}
+            className="mt-1 shrink-0 text-[#94A3B8] hover:text-accent transition-colors"
+            aria-label={selectedIds.has(offer.id) ? 'Désélectionner' : 'Sélectionner'}
+          >
+            {selectedIds.has(offer.id) ? (
+              <CheckSquare size={20} className="text-accent" />
+            ) : (
+              <Square size={20} />
+            )}
+          </button>
+
           {/* Logo */}
           <div className="w-12 h-12 rounded-xl bg-[#F7F8FC] border border-[#E2E8F0] flex items-center justify-center shrink-0 font-bold text-xs text-accent uppercase">
             {offer.company.slice(0, 2)}
@@ -222,16 +323,41 @@ export default function OffresPage() {
           </div>
         </motion.div>
       ))}
+
+      {/* Floating batch action bar */}
+      <AnimatePresence>
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1E293B] text-white rounded-2xl px-6 py-3 flex items-center gap-4 shadow-2xl z-50"
+          >
+            <span className="text-sm font-semibold">
+              {selectedIds.size} offre{selectedIds.size > 1 ? 's' : ''} sélectionnée{selectedIds.size > 1 ? 's' : ''}
+            </span>
+            <Button
+              size="sm"
+              className="bg-accent hover:bg-accent/90 text-white"
+              onClick={() => {
+                const selected = offers.filter((o) => selectedIds.has(o.id));
+                batchApplyMutation.mutate(selected);
+              }}
+              loading={batchApplyMutation.isPending}
+            >
+              <Send size={14} />
+              Postuler aux {selectedIds.size} offres
+            </Button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              title="Annuler la sélection"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
-}
-
-function offresOrMock(offers: JobOffer[]): JobOffer[] {
-  if (offers.length > 0) return offers;
-  return [
-    { id: '1', title: 'Lead UX Designer', company: 'Stripe', location: 'Paris (Remote OK)', contractType: 'CDI', description: "Rejoignez l'équipe Design de Stripe pour concevoir des expériences financières exceptionnelles. Vous travaillerez sur les produits phares de Stripe utilisés par des millions d'entreprises.", requirements: [], source: 'mock', url: '#', publishedAt: new Date().toISOString(), remote: true, salary: '65-80k€', matchScore: 94, sector: 'Tech' },
-    { id: '2', title: 'Product Designer', company: 'Figma', location: 'Paris', contractType: 'CDI', description: 'Conception de nouvelles fonctionnalités pour la plateforme de design collaborative numéro 1 au monde.', requirements: [], source: 'mock', url: '#', publishedAt: new Date(Date.now() - 86400000).toISOString(), remote: false, salary: '55-70k€', matchScore: 89, sector: 'Tech' },
-    { id: '3', title: 'UX/UI Designer Senior', company: 'Notion', location: 'Paris', contractType: 'CDI', description: "Créez des interfaces intuitives pour des millions d'utilisateurs du monde entier.", requirements: [], source: 'mock', url: '#', publishedAt: new Date(Date.now() - 172800000).toISOString(), remote: true, matchScore: 85, sector: 'Tech' },
-    { id: '4', title: 'Product Designer', company: 'Alan', location: 'Paris', contractType: 'CDI', description: "Redesignez l'expérience santé pour des millions de Français avec une équipe design world-class.", requirements: [], source: 'mock', url: '#', publishedAt: new Date(Date.now() - 259200000).toISOString(), remote: false, salary: '50-65k€', matchScore: 82, sector: 'Santé' },
-  ];
 }

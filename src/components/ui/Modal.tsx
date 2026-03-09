@@ -62,14 +62,15 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
             animate="animate"
             exit="exit"
             className={cn(
-              'relative w-full bg-white rounded-card shadow-2xl',
+              'relative w-full bg-white rounded-card shadow-2xl flex flex-col',
               'border border-[#E2E8F0]',
+              'max-h-[92vh]',
               sizeClasses[size],
               className,
             )}
           >
             {title && (
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] shrink-0">
                 <h3 id="modal-title" className="text-lg font-semibold text-[#1E293B] font-heading">
                   {title}
                 </h3>
@@ -82,7 +83,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
                 </button>
               </div>
             )}
-            <div className="p-6">{children}</div>
+            <div className="p-6 overflow-y-auto">{children}</div>
           </motion.div>
         </div>
       )}

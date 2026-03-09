@@ -23,6 +23,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/axios';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -43,6 +44,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'success' | 'warni
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/applications/stats').then((r) => r.data),
@@ -51,6 +53,11 @@ export default function DashboardPage() {
   const { data: applications, isLoading: appsLoading } = useQuery<Application[]>({
     queryKey: ['recent-applications'],
     queryFn: () => api.get('/applications?limit=5').then((r) => r.data),
+  });
+
+  const { data: recommended = [] } = useQuery<{ id: string; title: string; company: string; location: string; matchScore?: number }[]>({
+    queryKey: ['recommended-offers'],
+    queryFn: () => api.get('/offers/recommended').then((r) => r.data.slice(0, 3)),
   });
 
   const statCards = [
@@ -140,9 +147,9 @@ export default function DashboardPage() {
           </h2>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats?.weeklyActivity ?? mockWeekly} barSize={20}>
+              <BarChart data={stats?.weeklyData ?? []} barSize={20}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={{
@@ -211,7 +218,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {(applications ?? mockApplications).slice(0, 5).map((app) => {
+                {(applications ?? []).slice(0, 5).map((app) => {
                   const statusInfo = STATUS_LABELS[app.status] ?? { label: app.status, variant: 'neutral' };
                   return (
                     <tr key={app.id} className="border-b border-[#E2E8F0] hover:bg-[#F7F8FC] transition-colors">
@@ -245,16 +252,25 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-[#E2E8F0]">
-            {mockRecommended.map((offer) => (
+            {recommended.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-[#94A3B8]">Complétez votre profil pour voir les recommandations IA</div>
+            ) : recommended.map((offer) => (
               <div key={offer.id} className="px-5 py-4 hover:bg-[#F7F8FC] transition-colors">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <p className="font-semibold text-sm text-[#1E293B] line-clamp-1">{offer.title}</p>
-                  <span className="text-xs font-bold text-emerald-600 shrink-0 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                    {offer.score}%
-                  </span>
+                  {offer.matchScore !== undefined && (
+                    <span className="text-xs font-bold text-emerald-600 shrink-0 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                      {offer.matchScore}%
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-[#64748B] mb-2">{offer.company} · {offer.location}</p>
-                <Button size="sm" variant="secondary" className="text-xs h-7 px-2.5">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="text-xs h-7 px-2.5"
+                  onClick={() => router.push(`/candidatures/new?jobId=${offer.id}&title=${encodeURIComponent(offer.title)}&company=${encodeURIComponent(offer.company)}`)}
+                >
                   Postuler
                 </Button>
               </div>
@@ -281,27 +297,4 @@ function QuickAction({ href, icon: Icon, label, color }: { href: string; icon: R
   );
 }
 
-// Mock data for empty state
-const mockWeekly = [
-  { date: 'Lun', count: 3 },
-  { date: 'Mar', count: 7 },
-  { date: 'Mer', count: 4 },
-  { date: 'Jeu', count: 9 },
-  { date: 'Ven', count: 6 },
-  { date: 'Sam', count: 2 },
-  { date: 'Dim', count: 1 },
-];
-
-const mockApplications = [
-  { id: '1', company: 'Doctolib', jobTitle: 'Product Designer', status: 'INTERVIEW_SCHEDULED', appliedAt: new Date().toISOString() },
-  { id: '2', company: 'Qonto', jobTitle: 'UX Writer', status: 'SENT', appliedAt: new Date(Date.now() - 86400000).toISOString() },
-  { id: '3', company: 'Alan', jobTitle: 'Product Manager', status: 'VIEWED', appliedAt: new Date(Date.now() - 172800000).toISOString() },
-  { id: '4', company: 'Ledger', jobTitle: 'Designer UI', status: 'REJECTED', appliedAt: new Date(Date.now() - 259200000).toISOString() },
-  { id: '5', company: 'BlaBlaCar', jobTitle: 'Lead Designer', status: 'TO_SEND', appliedAt: new Date(Date.now() - 345600000).toISOString() },
-] as Application[];
-
-const mockRecommended = [
-  { id: '1', title: 'Lead UX Designer', company: 'Stripe', location: 'Paris', score: 94 },
-  { id: '2', title: 'Product Designer', company: 'Figma', location: 'Remote', score: 89 },
-  { id: '3', title: 'UX/UI Designer', company: 'Notion', location: 'Paris', score: 85 },
-];
+// (No mock data — all data fetched from real API)

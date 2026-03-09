@@ -66,18 +66,33 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   });
 
   const generateSummaryMutation = useMutation({
-    mutationFn: () => api.post(`/cv/generate-ai`, { type: 'summary', cvId: cv.id }),
+    mutationFn: () =>
+      api.post('/cv/generate-ai', { type: 'summary', cvId: cv.id, content: getValues() })
+        .then((res) => res.data),
     onSuccess: (res) => {
-      setValue('summary', res.data.summary);
+      setValue('summary', res.summary);
       toast.success('Résumé généré !');
     },
-    onError: () => toast.error('Erreur génération IA'),
+    onError: (err: Error) => toast.error((err as any)?.response?.data?.error ?? err.message ?? 'Erreur génération IA'),
   });
 
   const generatePDFMutation = useMutation({
-    mutationFn: () => api.post(`/cv/${cv.id}/generate-pdf`),
-    onSuccess: (res) => window.open(res.data.pdfUrl, '_blank'),
-    onError: () => toast.error('Erreur génération PDF'),
+    mutationFn: async () => {
+      const res = await api.post(`/cv/${cv.id}/generate-pdf`, {}, { responseType: 'text' });
+      return res.data;
+    },
+    onSuccess: (html: string) => {
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.write(html);
+        w.document.close();
+        setTimeout(() => w.print(), 500);
+      }
+    },
+    onError: (err: unknown) => {
+      const msg = (err as any)?.response?.data?.error ?? 'Erreur export PDF';
+      toast.error(msg);
+    },
   });
 
   const handleSave = () => {
@@ -134,13 +149,13 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
             onToggle={() => toggleSection('personal')}
           >
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Prénom" {...register('photo')} placeholder="Sophie" />
-              <Input label="Nom" placeholder="Martin" />
-              <Input label="Titre professionnel" placeholder="Product Designer" className="col-span-2" />
-              <Input label="Email" type="email" placeholder="sophie@exemple.com" />
-              <Input label="Téléphone" placeholder="+33 6 00 00 00 00" />
-              <Input label="Ville" placeholder="Paris, France" />
-              <Input label="LinkedIn" placeholder="linkedin.com/in/sophie-martin" />
+              <Input label="Prénom" {...register('personal.firstName')} placeholder="Sophie" />
+              <Input label="Nom" {...register('personal.lastName')} placeholder="Martin" />
+              <Input label="Titre professionnel" {...register('personal.title')} placeholder="Product Designer" className="col-span-2" />
+              <Input label="Email" type="email" {...register('personal.email')} placeholder="sophie@exemple.com" />
+              <Input label="Téléphone" {...register('personal.phone')} placeholder="+33 6 00 00 00 00" />
+              <Input label="Ville" {...register('personal.city')} placeholder="Paris, France" />
+              <Input label="LinkedIn" {...register('personal.linkedin')} placeholder="linkedin.com/in/sophie-martin" />
             </div>
           </Section>
 
@@ -378,12 +393,20 @@ function Section({
 }
 
 function CVPreview({ content }: { content: CVContent }) {
+  const p = content.personal;
   return (
     <div className="text-[11px] text-[#1E293B] space-y-4">
       {/* Header */}
       <div className="border-b-2 border-accent pb-3">
-        <h1 className="text-xl font-bold font-heading">Prénom Nom</h1>
-        <p className="text-accent font-semibold">Titre professionnel</p>
+        <h1 className="text-xl font-bold font-heading">
+          {[p?.firstName, p?.lastName].filter(Boolean).join(' ') || 'Prénom Nom'}
+        </h1>
+        <p className="text-accent font-semibold">{p?.title || 'Titre professionnel'}</p>
+        {(p?.email || p?.phone || p?.city) && (
+          <p className="text-[#64748B] text-[10px] mt-0.5">
+            {[p?.email, p?.phone, p?.city].filter(Boolean).join(' · ')}
+          </p>
+        )}
       </div>
 
       {content.summary && (

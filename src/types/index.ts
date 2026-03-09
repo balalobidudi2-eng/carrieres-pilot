@@ -17,9 +17,13 @@ export interface User {
   targetContract: string[];
   targetSectors: string[];
   targetLocations: string[];
+  skills: string[];
   plan: Plan;
   emailVerified: boolean;
   onboardingDone: boolean;
+  notifEmailNewOffer?: boolean;
+  notifEmailApplicationStatus?: boolean;
+  notifEmailWeeklyDigest?: boolean;
   createdAt: string;
 }
 
@@ -63,7 +67,19 @@ export interface CVLanguage {
   level: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'native';
 }
 
+export interface CVPersonal {
+  firstName?: string;
+  lastName?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  linkedin?: string;
+}
+
 export interface CVContent {
+  personal?: CVPersonal;
+  photo?: string;
   summary?: string;
   experiences: CVExperience[];
   education: CVEducation[];
@@ -71,7 +87,6 @@ export interface CVContent {
   languages: CVLanguage[];
   certifications?: { id: string; name: string; issuer: string; date: string }[];
   interests?: string[];
-  photo?: string;
 }
 
 export interface CV {
@@ -173,7 +188,8 @@ export interface DashboardStats {
   responseRate: number;
   interviewsCount: number;
   pendingCount: number;
-  weeklyActivity: { date: string; count: number }[];
+  weeklyData: { week: string; count: number }[];
+  byStatus?: Record<string, number>;
 }
 
 // ─── Notification ────────────────────────────────────────────────────────────

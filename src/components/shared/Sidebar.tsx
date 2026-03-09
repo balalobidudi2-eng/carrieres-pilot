@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { PlanBadge } from '@/components/ui/Badge';
+import { SubscriptionBar } from '@/components/shared/SubscriptionBar';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
@@ -139,6 +140,9 @@ export function Sidebar() {
           {sidebarOpen && <span>Se déconnecter</span>}
         </button>
       </div>
+
+      {/* Subscription usage bar */}
+      <SubscriptionBar collapsed={!sidebarOpen} />
 
       {/* User info */}
       {user && sidebarOpen && (

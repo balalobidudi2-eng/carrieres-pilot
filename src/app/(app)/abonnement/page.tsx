@@ -41,55 +41,55 @@ const PLANS: Plan[] = [
     icon: Zap,
     color: '#64748B',
     features: [
-      '3 CV créés',
-      '3 lettres de motivation IA',
-      '20 candidatures suivies',
+      '1 CV IA / jour',
+      '1 lettre IA / jour',
+      '10 recherches / jour',
+      '5 matchings IA / jour',
       'Tableau Kanban',
-      'Accès aux offres',
     ],
-    limits: { cvs: 3, letters: 3, applications: 20 },
+    limits: { cvs: 1, letters: 1, applications: 10 },
   },
   {
     id: 'PRO',
     name: 'Pro',
-    price: 19,
-    priceAnnual: 15,
+    price: 19.99,
+    priceAnnual: 15.99,
     description: 'Pour maximiser vos chances de décrocher le job idéal',
     icon: Sparkles,
     color: '#7C3AED',
     highlighted: true,
     features: [
-      'CV illimités avec IA',
-      'Lettres illimitées avec IA',
-      'Candidatures illimitées',
-      'Score ATS avancé',
-      'Préparation entretiens IA',
-      'Offres matchées par embeddings',
-      'Export PDF haute qualité',
+      '5 CV IA / jour',
+      '5 lettres IA / jour',
+      '100 recherches / jour',
+      '50 matchings IA / jour',
+      '10 candidatures auto / jour',
+      'Envoi email SMTP',
+      'Automatisation formulaires',
       'Support prioritaire',
     ],
-    limits: { cvs: -1, letters: -1, applications: -1 },
+    limits: { cvs: 5, letters: 5, applications: 100 },
     stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
   },
   {
     id: 'EXPERT',
     name: 'Expert',
-    price: 49,
-    priceAnnual: 39,
+    price: 34.99,
+    priceAnnual: 27.99,
     description: 'La solution complète pour les profils exigeants',
     icon: Crown,
     color: '#D97706',
     features: [
-      'Tout Pro inclus',
-      'Coaching carrière personnalisé',
-      'Relance automatique candidatures',
-      'Veille emploi automatique',
-      'Import LinkedIn',
-      'Analytics avancées',
-      'API access',
-      'Account manager dédié',
+      '50 CV IA / jour',
+      '50 lettres IA / jour',
+      '500 recherches / jour',
+      '200 matchings IA / jour',
+      '100 candidatures auto / jour',
+      'Envoi email SMTP',
+      'Automatisation formulaires',
+      'Analytics avancées + Support dédié',
     ],
-    limits: { cvs: -1, letters: -1, applications: -1 },
+    limits: { cvs: 50, letters: 50, applications: 500 },
     stripePriceId: process.env.NEXT_PUBLIC_STRIPE_EXPERT_PRICE_ID,
   },
 ];
@@ -105,8 +105,8 @@ export default function AbonnementPage() {
   });
 
   const checkoutMutation = useMutation({
-    mutationFn: (priceId: string) =>
-      api.post('/billing/checkout', { priceId }).then((r) => r.data.url),
+    mutationFn: (plan: 'PRO' | 'EXPERT') =>
+      api.post('/billing/checkout', { plan }).then((r) => r.data.url),
     onSuccess: (url: string) => window.location.href = url,
     onError: () => toast.error('Erreur lors de la redirection vers le paiement'),
   });
@@ -188,7 +188,7 @@ export default function AbonnementPage() {
 
               <div className="mb-3">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-extrabold font-heading text-[#1E293B]">{plan.price === 0 ? 'Gratuit' : `${plan.price}€`}</span>
+                  <span className="text-3xl font-extrabold font-heading text-[#1E293B]">{plan.price === 0 ? 'Gratuit' : `${plan.price.toFixed(2).replace('.', ',')}€`}</span>
                   {plan.price > 0 && <span className="text-xs text-[#94A3B8]">/mois</span>}
                 </div>
                 {plan.priceAnnual && (
@@ -222,7 +222,7 @@ export default function AbonnementPage() {
                 <Button
                   className="w-full"
                   variant={plan.highlighted ? 'primary' : 'outline'}
-                  onClick={() => plan.stripePriceId && checkoutMutation.mutate(plan.stripePriceId)}
+                  onClick={() => plan.id !== 'FREE' && checkoutMutation.mutate(plan.id as 'PRO' | 'EXPERT')}
                   loading={checkoutMutation.isPending}
                 >
                   Choisir {plan.name}

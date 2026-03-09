@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────
+
+enum Plan {
+  FREE
+  PRO
+  EXPERT
+}
+
+enum ApplicationStatus {
+  TO_SEND
+  SENT
+  VIEWED
+  INTERVIEW_SCHEDULED
+  INTERVIEW_DONE
+  OFFER_RECEIVED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum LetterTone {
+  professional
+  dynamic
+  creative
+}
+
+// ─── User ───────────────────────────────────────────────────────────
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  firstName       String?
+  lastName        String?
+  avatar          String?
+  phone           String?
+  linkedinUrl     String?
+  currentTitle    String?
+  location        String?
+  bio             String?
+  targetSalary    String?
+  targetContract  String[] @default([])
+  targetSectors   String[] @default([])
+  targetLocations String[] @default([])
+  skills          String[] @default([])
+  plan            Plan     @default(FREE)
+  emailVerified   Boolean  @default(false)
+  onboardingDone  Boolean  @default(false)
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String?
+
+  notifEmailNewOffer          Boolean @default(true)
+  notifEmailApplicationStatus Boolean @default(true)
+  notifEmailWeeklyDigest      Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cvs           CV[]
+  letters       CoverLetter[]
+  applications  Application[]
+  refreshTokens RefreshToken[]
+  dailyUsages   DailyUsage[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─── CV ─────────────────────────────────────────────────────────────
+
+model CV {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  template  String   @default("modern")
+  content   Json     @default("{}")
+  pdfUrl    String?
+  isDefault Boolean  @default(false)
+  atsScore  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications Application[]
+
+  @@index([userId])
+  @@map("cvs")
+}
+
+// ─── Cover Letter ───────────────────────────────────────────────────
+
+model CoverLetter {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String     @default("Sans titre")
+  jobTitle    String?
+  companyName String?
+  content     String
+  tone        LetterTone @default(professional)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  applications Application[]
+
+  @@index([userId])
+  @@map("cover_letters")
+}
+
+// ─── Application ────────────────────────────────────────────────────
+
+model Application {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobOfferId   String?
+  status       ApplicationStatus @default(TO_SEND)
+  company      String
+  jobTitle     String
+  jobUrl       String?
+  appliedAt    DateTime          @default(now())
+  cvId         String?
+  cv           CV?               @relation(fields: [cvId], references: [id], onDelete: SetNull)
+  letterId     String?
+  letter       CoverLetter?      @relation(fields: [letterId], references: [id], onDelete: SetNull)
+  notes        String?
+  nextStep     String?
+  nextStepDate DateTime?
+  contactEmail String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("applications")
+}
+
+// ─── Daily Usage (quota tracking) ───────────────────────────────────────
+
+model DailyUsage {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date            String   // YYYY-MM-DD in user timezone
+  cvGeneration    Int      @default(0)
+  coverLetter     Int      @default(0)
+  jobSearch       Int      @default(0)
+  aiMatching      Int      @default(0)
+  autoApply       Int      @default(0)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("daily_usages")
+}

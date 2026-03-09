@@ -31,14 +31,6 @@ interface Question {
   starAnswer?: string;
 }
 
-const MOCK_QUESTIONS: Question[] = [
-  { id: '1', question: 'Parlez-moi d\'un projet difficile que vous avez mené à bien.', category: 'behavioral', tip: 'Utilisez la méthode STAR : Situation, Tâche, Action, Résultat', starAnswer: '**Situation** : Lors de mon dernier poste, nous avions un délai serré pour la refonte de l\'app mobile.\n\n**Tâche** : Je devais coordonner 3 développeurs et livrer en 6 semaines.\n\n**Action** : J\'ai mis en place des daily stand-ups, créé un backlog priorisé dans Notion et travaillé en sprints d\'une semaine.\n\n**Résultat** : Livraison en 5 semaines avec 98% de satisfaction utilisateur.' },
-  { id: '2', question: 'Comment gérez-vous les conflits au sein d\'une équipe ?', category: 'behavioral', tip: 'Montrez votre maturité émotionnelle et votre capacité à trouver des solutions constructives' },
-  { id: '3', question: 'Quelle est votre approche pour prendre des décisions sous pression ?', category: 'situational', tip: 'Donnez un exemple concret et expliquez votre processus de décision' },
-  { id: '4', question: 'Comment restez-vous à jour sur les dernières tendances de votre domaine ?', category: 'technical', tip: 'Mentionnez des ressources spécifiques : newsletters, conférences, projets perso' },
-  { id: '5', question: 'Décrivez votre plus grande réussite professionnelle.', category: 'behavioral', tip: 'Choisissez un exemple mesurable avec un impact business clair' },
-];
-
 const categoryLabel = (c: Question['category']) =>
   ({ behavioral: 'Comportemental', technical: 'Technique', situational: 'Situationnel' }[c]);
 const categoryVariant = (c: Question['category']): 'primary' | 'success' | 'warning' =>
@@ -53,11 +45,10 @@ export default function EntretiensPage() {
   const [userAnswer, setUserAnswer] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const { data: questions = MOCK_QUESTIONS, isLoading, refetch } = useQuery<Question[]>({
+  const { data: questions = [], isLoading, refetch } = useQuery<Question[]>({
     queryKey: ['interview-questions', sector, level],
     queryFn: () =>
-      api.post('/interviews/questions', { sector, level }).then((r) => r.data),
-    placeholderData: MOCK_QUESTIONS,
+      api.post('/interviews/questions', { sector, level }).then((r) => r.data.questions ?? r.data),
     retry: false,
   });
 
@@ -68,7 +59,7 @@ export default function EntretiensPage() {
     onError: () => toast.error('Erreur lors de l\'analyse'),
   });
 
-  const list = questions.length > 0 ? questions : MOCK_QUESTIONS;
+  const list = questions.length > 0 ? questions : [];
 
   return (
     <motion.div initial="initial" animate="animate" variants={staggerContainer} className="space-y-6 max-w-[900px]">
@@ -200,7 +191,7 @@ export default function EntretiensPage() {
       </div>
 
       {/* Simulate Modal */}
-      <Modal isOpen={simulateOpen} onClose={() => setSimulateOpen(false)} title="Simulation d'entretien" maxWidth="max-w-2xl">
+      <Modal open={simulateOpen} onClose={() => setSimulateOpen(false)} title="Simulation d'entretien" size="lg">
         <div className="mt-2 space-y-4">
           {/* Progress */}
           <div className="flex items-center gap-3">

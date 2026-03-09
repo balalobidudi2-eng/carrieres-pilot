@@ -26,6 +26,7 @@ import {
   Calendar,
   MapPin,
   GripVertical,
+  Mail,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -51,6 +52,9 @@ export default function CandidaturesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [addStatus, setAddStatus] = useState<ApplicationStatus>('TO_SEND');
   const [newApp, setNewApp] = useState({ company: '', jobTitle: '', notes: '' });
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailApp, setEmailApp] = useState<Application | null>(null);
+  const [emailForm, setEmailForm] = useState({ to: '', subject: '', body: '' });
 
   const { data: applications = [], isLoading } = useQuery<Application[]>({
     queryKey: ['applications'],
@@ -85,8 +89,43 @@ export default function CandidaturesPage() {
       setNewApp({ company: '', jobTitle: '', notes: '' });
       toast.success('Candidature ajoutée !');
     },
-    onError: () => toast.error('Erreur lors de la création'),
+    onError: (err: unknown) => {
+      const msg = (err as any)?.response?.data?.error ?? 'Erreur lors de la création';
+      toast.error(msg);
+    },
   });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: (data: { to: string; subject: string; body: string; applicationId: string }) =>
+      api.post('/applications/send-email', {
+        to: data.to,
+        fromName: 'Candidat',
+        fromEmail: '',
+        subject: data.subject,
+        body: data.body,
+      }).then(() => api.patch(`/applications/${data.applicationId}`, { status: 'SENT' })),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['applications'] });
+      setEmailOpen(false);
+      setEmailApp(null);
+      setEmailForm({ to: '', subject: '', body: '' });
+      toast.success('Email envoyé et candidature mise à jour !');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as any)?.response?.data?.error ?? 'Erreur lors de l\'envoi (vérifiez la config SMTP)';
+      toast.error(msg);
+    },
+  });
+
+  const openEmailModal = (app: Application) => {
+    setEmailApp(app);
+    setEmailForm({
+      to: app.contactEmail ?? '',
+      subject: `Candidature : ${app.jobTitle} — ${app.company}`,
+      body: `Bonjour,\n\nJe me permets de vous adresser ma candidature pour le poste de ${app.jobTitle} au sein de ${app.company}.\n\nVous trouverez ci-joint mon CV.\n\nCordialement`,
+    });
+    setEmailOpen(true);
+  };
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -137,6 +176,7 @@ export default function CandidaturesPage() {
               column={col}
               applications={byStatus(col.id)}
               onAddClick={() => { setAddStatus(col.id); setAddOpen(true); }}
+              onEmailClick={openEmailModal}
             />
           ))}
         </div>
@@ -189,6 +229,44 @@ export default function CandidaturesPage() {
           </Button>
         </div>
       </Modal>
+
+      {/* Email modal */}
+      <Modal open={emailOpen} onClose={() => setEmailOpen(false)} title="Envoyer par email">
+        <div className="space-y-4">
+          <Input
+            label="Destinataire"
+            type="email"
+            placeholder="recruteur@entreprise.com"
+            value={emailForm.to}
+            onChange={(e) => setEmailForm((p) => ({ ...p, to: e.target.value }))}
+            required
+          />
+          <Input
+            label="Objet"
+            value={emailForm.subject}
+            onChange={(e) => setEmailForm((p) => ({ ...p, subject: e.target.value }))}
+            required
+          />
+          <Textarea
+            label="Corps du message"
+            value={emailForm.body}
+            onChange={(e) => setEmailForm((p) => ({ ...p, body: e.target.value }))}
+            rows={6}
+          />
+          <Button
+            fullWidth
+            loading={sendEmailMutation.isPending}
+            onClick={() => {
+              if (!emailApp || !emailForm.to) return;
+              sendEmailMutation.mutate({ ...emailForm, applicationId: emailApp.id });
+            }}
+            disabled={!emailForm.to || !emailForm.subject || !emailForm.body}
+          >
+            <Mail size={15} />
+            Envoyer la candidature
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -197,10 +275,12 @@ function KanbanColumn({
   column,
   applications,
   onAddClick,
+  onEmailClick,
 }: {
   column: { id: ApplicationStatus; label: string; color: string };
   applications: Application[];
   onAddClick: () => void;
+  onEmailClick: (app: Application) => void;
 }) {
   return (
     <SortableContext items={applications.map((a) => a.id)} strategy={verticalListSortingStrategy} id={column.id}>
@@ -231,7 +311,7 @@ function KanbanColumn({
         {/* Cards */}
         <div className="space-y-2 min-h-[40px]">
           {applications.map((app) => (
-            <ApplicationCard key={app.id} app={app} />
+            <ApplicationCard key={app.id} app={app} onEmailClick={onEmailClick} />
           ))}
         </div>
       </div>
@@ -239,7 +319,7 @@ function KanbanColumn({
   );
 }
 
-function ApplicationCard({ app, isDragging = false }: { app: Application; isDragging?: boolean }) {
+function ApplicationCard({ app, isDragging = false, onEmailClick }: { app: Application; isDragging?: boolean; onEmailClick?: (app: Application) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } =
     useSortable({ id: app.id });
 
@@ -281,6 +361,15 @@ function ApplicationCard({ app, isDragging = false }: { app: Application; isDrag
       </div>
       {app.notes && (
         <p className="mt-2 text-[10px] text-[#94A3B8] line-clamp-2 italic">{app.notes}</p>
+      )}
+      {app.status === 'TO_SEND' && onEmailClick && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onEmailClick(app); }}
+          className="mt-2 flex items-center gap-1 text-[10px] text-accent hover:text-accent/80 font-semibold transition-colors"
+        >
+          <Mail size={11} />
+          Envoyer par email
+        </button>
       )}
     </div>
   );

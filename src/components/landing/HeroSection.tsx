@@ -1,12 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, Play, Star, Users } from 'lucide-react';
+import { ArrowRight, Play, Star } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { fadeInUp, floatAnimation, staggerContainer } from '@/lib/animations';
 
 export function HeroSection() {
+  const [demoOpen, setDemoOpen] = useState(false);
   return (
     <section className="relative overflow-hidden bg-gradient-mesh pt-32 pb-24">
       {/* Background blobs */}
@@ -54,7 +57,10 @@ export function HeroSection() {
                   <ArrowRight size={18} />
                 </Button>
               </Link>
-              <button className="inline-flex items-center gap-2.5 h-12 px-5 rounded-btn border border-[#E2E8F0] text-[#1E293B] text-sm font-semibold bg-white hover:border-accent hover:text-accent transition-all duration-250">
+              <button
+                onClick={() => setDemoOpen(true)}
+                className="inline-flex items-center gap-2.5 h-12 px-5 rounded-btn border border-[#E2E8F0] text-[#1E293B] text-sm font-semibold bg-white hover:border-accent hover:text-accent transition-all duration-250"
+              >
                 <span className="flex items-center justify-center w-8 h-8 bg-accent/10 rounded-full">
                   <Play size={14} className="text-accent fill-current ml-0.5" />
                 </span>
@@ -94,6 +100,36 @@ export function HeroSection() {
           </motion.div>
         </div>
       </div>
+      <Modal open={demoOpen} onClose={() => setDemoOpen(false)} title="Démo CarrièrePilot" size="lg">
+        {process.env.NEXT_PUBLIC_DEMO_VIDEO_URL ? (
+          <div className="aspect-video">
+            <iframe
+              src={process.env.NEXT_PUBLIC_DEMO_VIDEO_URL}
+              className="w-full h-full rounded-xl"
+              allow="autoplay; fullscreen"
+              allowFullScreen
+            />
+          </div>
+        ) : (
+          <div className="aspect-video bg-gradient-to-br from-[#F0EAFF] to-[#EEF2FF] rounded-xl flex flex-col items-center justify-center gap-6 p-8">
+            <div className="w-16 h-16 bg-gradient-brand rounded-2xl flex items-center justify-center shadow-lg">
+              <Play size={28} className="text-white fill-current ml-1" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="font-heading font-bold text-[#1E293B] text-xl">Démo vidéo bientôt disponible</p>
+              <p className="text-[#64748B] text-sm max-w-xs">
+                Inscrivez-vous gratuitement pour accéder à la plateforme et la découvrir par vous-même.
+              </p>
+            </div>
+            <Link href="/inscription" onClick={() => setDemoOpen(false)}>
+              <Button size="lg">
+                Essayer gratuitement
+                <ArrowRight size={18} />
+              </Button>
+            </Link>
+          </div>
+        )}
+      </Modal>
     </section>
   );
 }

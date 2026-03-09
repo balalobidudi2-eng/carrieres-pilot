@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
@@ -15,6 +15,8 @@ import {
   Trash2,
   ChevronDown,
   Wand2,
+  Upload,
+  CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
@@ -29,7 +31,7 @@ type Tone = 'professional' | 'dynamic' | 'creative';
 
 const schema = z.object({
   jobTitle: z.string().min(2, 'Requis'),
-  company: z.string().min(2, 'Requis'),
+  company: z.string().optional(),
   jobDescription: z.string().min(20, 'Décrivez le poste (20 caractères min.)'),
   tone: z.enum(['professional', 'dynamic', 'creative']),
 });
@@ -43,13 +45,26 @@ const TONES: { value: Tone; label: string; desc: string }[] = [
 
 export default function LettresPage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importJobTitle, setImportJobTitle] = useState('');
+  const [importCompany, setImportCompany] = useState('');
+  const [importContent, setImportContent] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const letterFileRef = useRef<HTMLInputElement>(null);
   const [generated, setGenerated] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [viewId, setViewId] = useState<string | null>(null);
 
   const { data: letters = [], refetch } = useQuery<CoverLetter[]>({
     queryKey: ['letters'],
     queryFn: () => api.get('/letters').then((r) => r.data),
     placeholderData: [],
+  });
+
+  const { data: profile } = useQuery<{ firstName?: string; lastName?: string; currentTitle?: string; skills?: string[] }>({
+    queryKey: ['me'],
+    queryFn: () => api.get('/users/me').then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
   });
 
   const {
@@ -73,7 +88,12 @@ export default function LettresPage() {
       setGenerated(content);
       toast.success('Lettre générée avec succès !');
     },
-    onError: () => toast.error('Erreur lors de la génération'),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : null)
+        ?? 'Erreur lors de la génération';
+      toast.error(msg);
+    },
   });
 
   const saveMutation = useMutation({
@@ -92,13 +112,34 @@ export default function LettresPage() {
     mutationFn: (id: string) => api.delete(`/letters/${id}`),
     onSuccess: () => { refetch(); toast.success('Lettre supprimée'); },
   });
-
+  const importMutation = useMutation({
+    mutationFn: (data: { jobTitle: string; company: string; content: string; file?: File | null }) => {
+      if (data.file) {
+        const form = new FormData();
+        form.append('file', data.file);
+        form.append('jobTitle', data.jobTitle);
+        form.append('company', data.company);
+        return api.post('/letters/import', form);
+      }
+      return api.post('/letters/import', { jobTitle: data.jobTitle, company: data.company, content: data.content });
+    },
+    onSuccess: () => {
+      refetch();
+      setImportOpen(false);
+      setImportJobTitle('');
+      setImportCompany('');
+      setImportContent('');
+      setImportFile(null);
+      toast.success('Lettre import\u00e9e !');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : null)
+        ?? 'Erreur lors de l\'import';
+      toast.error(msg);
+    },
+  });
   const onGenerate = handleSubmit((data) => generateMutation.mutate(data));
-
-  const mockLetters: CoverLetter[] = letters.length > 0 ? letters : [
-    { id: '1', userId: '', jobTitle: 'Lead UX Designer', company: 'Stripe', tone: 'professional', content: 'Madame, Monsieur,\n\nFort de 5 ans d\'expérience en UX Design…', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    { id: '2', userId: '', jobTitle: 'Product Designer', company: 'Figma', tone: 'dynamic', content: 'Passionné par la conception d\'expériences…', createdAt: new Date(Date.now() - 86400000 * 3).toISOString(), updatedAt: new Date().toISOString() },
-  ];
 
   return (
     <motion.div initial="initial" animate="animate" variants={staggerContainer} className="space-y-6 max-w-[900px]">
@@ -108,15 +149,27 @@ export default function LettresPage() {
           <h2 className="font-heading text-2xl font-bold text-[#1E293B]">Lettres de motivation</h2>
           <p className="text-sm text-[#64748B] mt-0.5">Générées par IA, personnalisées pour chaque offre</p>
         </div>
-        <Button onClick={() => { reset(); setGenerated(null); setModalOpen(true); }}>
-          <Plus size={16} />
-          Nouvelle lettre
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>
+            <Upload size={16} />
+            Importer
+          </Button>
+          <Button onClick={() => { reset(); setGenerated(null); setModalOpen(true); }}>
+            <Plus size={16} />
+            Nouvelle lettre
+          </Button>
+        </div>
       </motion.div>
 
       {/* Letters list */}
       <div className="space-y-3">
-        {mockLetters.map((l) => (
+        {letters.length === 0 ? (
+          <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-12 text-center" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+            <FileText size={40} className="mx-auto text-[#CBD5E1] mb-3" />
+            <p className="font-heading font-semibold text-[#1E293B]">Aucune lettre pour le moment</p>
+            <p className="text-sm text-[#64748B] mt-1">Cliquez sur « Nouvelle lettre » pour en générer une avec l&apos;IA.</p>
+          </motion.div>
+        ) : letters.map((l) => (
           <motion.div
             key={l.id}
             variants={fadeInUp}
@@ -130,7 +183,7 @@ export default function LettresPage() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold text-[#1E293B] text-sm leading-tight">{l.jobTitle}</h3>
-                  <p className="text-xs text-[#64748B]">{l.company}</p>
+                  <p className="text-xs text-[#64748B]">{l.companyName}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge variant={l.tone === 'professional' ? 'primary' : l.tone === 'dynamic' ? 'success' : 'warning'}>
@@ -141,10 +194,21 @@ export default function LettresPage() {
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-[#64748B] mt-2 line-clamp-2 leading-relaxed">{l.content}</p>
+              <p className={`text-sm text-[#64748B] mt-2 leading-relaxed whitespace-pre-line ${viewId === l.id ? 'max-h-[50vh] overflow-y-auto' : 'line-clamp-3'}`}>{l.content}</p>
               <div className="flex gap-2 mt-3">
+                <Button variant="outline" size="sm" onClick={() => setViewId(viewId === l.id ? null : l.id)}>
+                  <ChevronDown size={12} className={`transition-transform ${viewId === l.id ? 'rotate-180' : ''}`} />{viewId === l.id ? 'Réduire' : 'Voir'}
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(l.content); toast.success('Copié !'); }}>
                   <Copy size={12} />Copier
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => {
+                  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(l.jobTitle || '')} — ${esc(l.companyName || '')}</title><style>body{font-family:'Segoe UI',Arial,sans-serif;max-width:700px;margin:60px auto;padding:40px;line-height:1.7;color:#1E293B}h1{font-size:18px;margin-bottom:4px}.meta{color:#64748B;font-size:14px;margin-bottom:32px}.content{white-space:pre-wrap;font-size:15px}@media print{body{margin:0}}</style></head><body><h1>${esc(l.jobTitle || '')}</h1><div class="meta">${esc(l.companyName || '')} · ${new Date(l.createdAt).toLocaleDateString('fr-FR')}</div><div class="content">${esc(l.content || '')}</div></body></html>`;
+                  const w = window.open('', '_blank');
+                  if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
+                }}>
+                  <Download size={12} />Télécharger PDF
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(l.id)}>
                   <Trash2 size={12} />Supprimer
@@ -156,11 +220,19 @@ export default function LettresPage() {
       </div>
 
       {/* Generate Modal */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Générer une lettre de motivation" maxWidth="max-w-2xl">
-        <form onSubmit={onGenerate} className="space-y-4 mt-2">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Générer une lettre de motivation" size="lg">
+        {profile?.firstName && (
+          <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 text-green-700 rounded-lg px-3 py-2 mb-3">
+            <CheckCircle size={13} className="shrink-0" />
+            Profil chargé — <strong>{profile.firstName} {profile.lastName}</strong>
+            {profile.skills?.length ? <span className="text-green-600">· {profile.skills.slice(0, 3).join(', ')}{profile.skills.length > 3 ? '…' : ''}</span> : null}
+            <span className="text-green-600 ml-auto">• données utilisées automatiquement</span>
+          </div>
+        )}
+        <form onSubmit={onGenerate} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Input label="Poste visé" {...register('jobTitle')} error={errors.jobTitle?.message} placeholder="ex: Lead UX Designer" />
-            <Input label="Entreprise" {...register('company')} error={errors.company?.message} placeholder="ex: Stripe" />
+            <Input label="Entreprise (optionnel)" {...register('company')} error={errors.company?.message} placeholder="ex: Stripe" />
           </div>
           <Textarea
             label="Description du poste"
@@ -220,19 +292,24 @@ export default function LettresPage() {
               <textarea
                 value={generated}
                 onChange={(e) => setGenerated(e.target.value)}
-                rows={10}
-                className="w-full p-3 border border-[#E2E8F0] rounded-btn text-sm text-[#1E293B] focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 resize-y leading-relaxed"
+                className="w-full p-4 border border-[#E2E8F0] rounded-btn text-sm text-[#1E293B] focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 resize-y leading-[1.85] font-serif"
+                style={{ minHeight: '520px' }}
               />
               <div className="flex gap-2 mt-3">
                 <Button
                   className="flex-1"
-                  onClick={() => {
-                    const vals = (document.querySelector('form') as HTMLFormElement);
-                    handleSubmit((data) => saveMutation.mutate({ ...data, content: generated }))();
-                  }}
+                  onClick={() => handleSubmit((data) => saveMutation.mutate({ ...data, content: generated! }))()}
                   loading={saveMutation.isPending}
                 >
                   Sauvegarder
+                </Button>
+                <Button variant="outline" onClick={() => {
+                  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Lettre de motivation</title><style>body{font-family:'Segoe UI',Arial,sans-serif;max-width:700px;margin:60px auto;padding:40px;line-height:1.7;color:#1E293B}.content{white-space:pre-wrap;font-size:15px}@media print{body{margin:0}}</style></head><body><div class="content">${esc(generated!)}</div></body></html>`;
+                  const w = window.open('', '_blank');
+                  if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
+                }}>
+                  <Download size={14} />Télécharger PDF
                 </Button>
                 <Button variant="outline" onClick={() => setModalOpen(false)}>
                   Fermer
@@ -241,6 +318,87 @@ export default function LettresPage() {
             </motion.div>
           )}
         </AnimatePresence>
+      </Modal>
+
+      {/* Import Modal */}
+      <Modal open={importOpen} onClose={() => { setImportOpen(false); setImportFile(null); setImportContent(''); }} title="Importer une lettre de motivation">
+        <div className="space-y-4 mt-2">
+          <p className="text-sm text-[#64748B]">
+            S\u00e9lectionnez un fichier <strong>.pdf</strong>, <strong>.docx</strong> ou <strong>.txt</strong>,
+            ou collez le texte de votre lettre ci-dessous.
+          </p>
+
+          {/* File picker */}
+          <input
+            ref={letterFileRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setImportFile(f);
+              if (f?.name.endsWith('.txt')) {
+                const reader = new FileReader();
+                reader.onload = (ev) => setImportContent((ev.target?.result as string) ?? '');
+                reader.readAsText(f, 'UTF-8');
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => letterFileRef.current?.click()}
+            className="w-full border-2 border-dashed border-[#E2E8F0] hover:border-accent rounded-btn p-5 text-center transition-colors cursor-pointer group"
+          >
+            {importFile ? (
+              <div className="flex items-center justify-center gap-2 text-accent font-medium text-sm">
+                <FileText size={18} />
+                <span>{importFile.name}</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-[#94A3B8] group-hover:text-accent transition-colors">
+                <Upload size={24} />
+                <span className="text-sm font-medium">Cliquez pour choisir un fichier</span>
+                <span className="text-xs">.pdf, .docx, .txt</span>
+              </div>
+            )}
+          </button>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Poste vis\u00e9"
+              placeholder="ex: Lead UX Designer"
+              value={importJobTitle}
+              onChange={(e) => setImportJobTitle(e.target.value)}
+            />
+            <Input
+              label="Entreprise"
+              placeholder="ex: Stripe"
+              value={importCompany}
+              onChange={(e) => setImportCompany(e.target.value)}
+            />
+          </div>
+
+          {/* Paste fallback */}
+          {!importFile && (
+            <Textarea
+              label="Ou collez le texte de la lettre"
+              placeholder="Collez ici le texte de votre lettre de motivation..."
+              value={importContent}
+              onChange={(e) => setImportContent(e.target.value)}
+              rows={8}
+            />
+          )}
+
+          <Button
+            fullWidth
+            onClick={() => importMutation.mutate({ jobTitle: importJobTitle, company: importCompany, content: importContent, file: importFile })}
+            loading={importMutation.isPending}
+            disabled={!importFile && !importContent.trim()}
+          >
+            <Upload size={15} />
+            {importMutation.isPending ? 'Import en cours...' : 'Importer la lettre'}
+          </Button>
+        </div>
       </Modal>
     </motion.div>
   );
