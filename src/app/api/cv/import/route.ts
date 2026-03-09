@@ -122,21 +122,29 @@ export async function POST(req: NextRequest) {
         skills: [],
         languages: [],
       },
+      truncated: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }, { status: 201 });
   }
+
+  const MAX_CHARS = 8000;
+  const truncated = text.length > MAX_CHARS;
+  const textToAnalyze = text.slice(0, MAX_CHARS);
+
   let content: Record<string, unknown>;
   try {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: CV_PROMPT(text) }],
+      messages: [{ role: 'user', content: CV_PROMPT(textToAnalyze) }],
       temperature: 0.2,
       response_format: { type: 'json_object' },
     });
     content = JSON.parse(completion.choices[0].message.content ?? '{}');
-  } catch {
-    return NextResponse.json({ error: "Erreur lors de l'analyse IA du CV" }, { status: 500 });
+  } catch (err: unknown) {
+    console.error('[CV IMPORT] OpenAI error:', err);
+    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    return NextResponse.json({ error: `Erreur analyse IA : ${msg}` }, { status: 500 });
   }
 
   let cv;
@@ -151,12 +159,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     if (isDbConnectionError(err)) {
+      await incrementUsage(userId, 'cv_generation').catch(() => {});
       return NextResponse.json({
         id: `cv-import-${Date.now()}`,
         userId,
         name: name.slice(0, 100),
         template: 'modern',
         content,
+        truncated,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }, { status: 201 });
@@ -168,5 +178,5 @@ export async function POST(req: NextRequest) {
 
   await incrementUsage(userId, 'cv_generation');
 
-  return NextResponse.json(cv, { status: 201 });
+  return NextResponse.json({ ...cv, truncated }, { status: 201 });
 }
