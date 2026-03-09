@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import { generateCoverLetter } from '@/lib/openai-service';
-
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/auth';
-import { generateCoverLetter } from '@/lib/openai-service';
 import { DEMO_USER_ID } from '@/lib/demo-user';
 
 /** GET /api/letters — list user's letters */
