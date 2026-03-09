@@ -41,3 +41,5 @@ yarn-error.log*
 *.pem
 
 /src/generated/prisma
+
+.env*.local

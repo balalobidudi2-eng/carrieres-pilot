@@ -3,6 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { requireAuth, revokeUserTokens, clearAuthCookies } from '@/lib/auth';
 import { DEMO_USER, DEMO_USER_ID } from '@/lib/demo-user';
 
+// Must mirror TEST_ACCOUNTS from login/route.ts
+const TEST_USERS: Record<string, { id: string; email: string; firstName: string; lastName: string; plan: 'FREE' | 'PRO' | 'EXPERT' }> = {
+  'test-free': { id: 'test-free', email: 'test-free@carrieres-pilot.fr', firstName: 'Alex', lastName: 'Dupont', plan: 'FREE' },
+  'test-pro': { id: 'test-pro', email: 'test-pro@carrieres-pilot.fr', firstName: 'Marie', lastName: 'Bernard', plan: 'PRO' },
+  'test-expert': { id: 'test-expert', email: 'test-expert@carrieres-pilot.fr', firstName: 'Julien', lastName: 'Moreau', plan: 'EXPERT' },
+};
+
 /** GET /api/users/me — current user profile */
 export async function GET(req: NextRequest) {
   let userId: string;
@@ -11,6 +18,12 @@ export async function GET(req: NextRequest) {
   // Return demo user immediately without hitting DB
   if (userId === DEMO_USER_ID) {
     return NextResponse.json(DEMO_USER);
+  }
+
+  // Return test account user immediately without hitting DB
+  const testUser = TEST_USERS[userId];
+  if (testUser) {
+    return NextResponse.json({ ...testUser, avatar: null, phone: null, linkedinUrl: null, currentTitle: null, location: null, bio: null, targetSalary: null, targetContract: [], targetSectors: [], targetLocations: [], skills: [], emailVerified: true, onboardingDone: false, createdAt: new Date().toISOString() });
   }
 
   try {

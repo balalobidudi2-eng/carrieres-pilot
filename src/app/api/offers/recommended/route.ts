@@ -6,13 +6,21 @@ import { scoreOfferMatch } from '@/lib/openai-service';
 import { checkQuota, incrementUsage, getUserPlan } from '@/lib/quota-service';
 import { DEMO_USER_ID } from '@/lib/demo-user';
 
+const MOCK_OFFERS = [
+  { id: 'mock-1', title: 'Product Designer Senior', company: 'Doctolib', location: 'Paris', contractType: 'CDI', salary: '55 000 – 70 000 €', description: 'Rejoignez l\'équipe Design de Doctolib pour créer des expériences médicales innovantes.', requirements: ['Figma', 'UI/UX', '5+ ans expérience'], postedAt: new Date(Date.now() - 2 * 86400000).toISOString(), url: '#', matchScore: 95 },
+  { id: 'mock-2', title: 'UX/UI Designer', company: 'BlaBlaCar', location: 'Paris', contractType: 'CDI', salary: '45 000 – 58 000 €', description: 'Participez à la refonte de l\'expérience mobilité partagée pour des millions d\'utilisateurs.', requirements: ['Figma', 'User Research', 'Prototyping'], postedAt: new Date(Date.now() - 4 * 86400000).toISOString(), url: '#', matchScore: 88 },
+  { id: 'mock-3', title: 'Head of Design', company: 'Alan', location: 'Remote', contractType: 'CDI', salary: '70 000 – 90 000 €', description: 'Définissez la vision Design de notre produit de santé numérique en forte croissance.', requirements: ['Leadership', 'Product Design', 'Design System'], postedAt: new Date(Date.now() - 7 * 86400000).toISOString(), url: '#', matchScore: 82 },
+  { id: 'mock-4', title: 'Product Designer', company: 'Qonto', location: 'Paris', contractType: 'CDI', salary: '48 000 – 62 000 €', description: 'Améliorez l\'expérience bancaire pour les TPE/PME européennes.', requirements: ['Figma', 'Design System', 'B2B SaaS'], postedAt: new Date(Date.now() - 10 * 86400000).toISOString(), url: '#', matchScore: 79 },
+  { id: 'mock-5', title: 'UX Researcher', company: 'Ledger', location: 'Paris', contractType: 'CDI', salary: '42 000 – 55 000 €', description: 'Menez des recherches utilisateurs pour le leader mondial des solutions crypto hardware.', requirements: ['User Testing', 'Interviews', 'Personas'], postedAt: new Date(Date.now() - 14 * 86400000).toISOString(), url: '#', matchScore: 74 },
+];
+
 /** GET /api/offers/recommended — offers matched to user profile */
 export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
-  // Quota check
-  const plan = await getUserPlan(userId);
+  // Quota check — skip Prisma for demo user
+  const plan = userId === DEMO_USER_ID ? 'PRO' : await getUserPlan(userId).catch(() => 'FREE');
   const quota = userId === DEMO_USER_ID
     ? { allowed: true, used: 0, max: 50, remaining: 50 }
     : await checkQuota(userId, plan, 'ai_matching');
@@ -23,9 +31,14 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // France Travail API not configured — return mock offers
   if (!process.env.FRANCE_TRAVAIL_CLIENT_ID) {
-    return NextResponse.json({ error: 'France Travail API non configurée' }, { status: 503 });
+    return NextResponse.json(MOCK_OFFERS);
   }
+
+  // Use explicit search query if provided, otherwise build from user profile
+  const { searchParams } = new URL(req.url);
+  const searchQuery = searchParams.get('q');
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -36,8 +49,8 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  // Build search query from user profile
-  const keywords = [user?.currentTitle, ...(user?.skills?.slice(0, 3) ?? [])].filter(Boolean).join(' ');
+  // Build search query from explicit param or user profile
+  const keywords = searchQuery || [user?.currentTitle, ...(user?.skills?.slice(0, 3) ?? [])].filter(Boolean).join(' ');
   const contractMap: Record<string, string> = { CDI: 'CDI', CDD: 'CDD', Stage: 'SAI', Alternance: 'MIS' };
   const typeContrat = user?.targetContract?.[0] ? contractMap[user.targetContract[0]] : undefined;
 

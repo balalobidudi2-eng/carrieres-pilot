@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/axios';
 import { staggerContainer, fadeInUp } from '@/lib/animations';
+import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
 
 const SECTORS = ['Tech', 'Design', 'Marketing', 'Finance', 'Santé', 'Retail', 'RH', 'Commercial'];
@@ -37,6 +38,7 @@ const categoryVariant = (c: Question['category']): 'primary' | 'success' | 'warn
   ({ behavioral: 'primary', technical: 'success', situational: 'warning' } as const)[c];
 
 export default function EntretiensPage() {
+  const { user } = useAuthStore();
   const [sector, setSector] = useState('Tech');
   const [level, setLevel] = useState('Confirmé');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -69,13 +71,30 @@ export default function EntretiensPage() {
           <h2 className="font-heading text-2xl font-bold text-[#1E293B]">Préparation aux entretiens</h2>
           <p className="text-sm text-[#64748B] mt-0.5">Questions IA adaptées à votre profil et secteur</p>
         </div>
-        <Button onClick={() => { setCurrentQ(0); setUserAnswer(''); setFeedback(null); setSimulateOpen(true); }}>
+        <Button onClick={() => { setCurrentQ(0); setUserAnswer(''); setFeedback(null); setSimulateOpen(true); }} disabled={user?.plan === 'FREE'}>
           <Play size={15} />
           Simuler un entretien
         </Button>
       </motion.div>
 
-      {/* Filters */}
+      {/* FREE plan gate */}
+      {user?.plan === 'FREE' && (
+        <motion.div variants={fadeInUp} className="bg-amber-50 border border-amber-200 rounded-card p-8 text-center">
+          <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Mic size={26} className="text-amber-500" />
+          </div>
+          <h3 className="font-heading font-bold text-lg text-[#1E293B] mb-1">Fonctionnalité réservée aux plans payants</h3>
+          <p className="text-sm text-[#64748B] max-w-md mx-auto">
+            La préparation aux entretiens avec 2 séries de 10 questions IA personnalisées est disponible à partir du plan <strong>Pro</strong>.
+          </p>
+          <Button className="mt-5" onClick={() => window.location.href = '/abonnement'}>
+            Passer au plan Pro
+          </Button>
+        </motion.div>
+      )}
+
+      {/* Filters — PRO/EXPERT only */}
+      {user?.plan !== 'FREE' && (<>
       <motion.div variants={fadeInUp} className="flex flex-wrap gap-3 items-center p-4 bg-white rounded-card border border-[#E2E8F0]" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
         <div>
           <p className="text-xs font-semibold text-[#64748B] mb-1.5 uppercase tracking-wide">Secteur</p>
@@ -265,6 +284,7 @@ export default function EntretiensPage() {
           </AnimatePresence>
         </div>
       </Modal>
+      </>)}
     </motion.div>
   );
 }

@@ -7,6 +7,13 @@ import { DEMO_USER, DEMO_USER_ID } from '@/lib/demo-user';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-carrieres-pilot-fallback';
 
+// Must mirror TEST_ACCOUNTS from login/route.ts
+const TEST_USERS: Record<string, { id: string; email: string; firstName: string; lastName: string; plan: 'FREE' | 'PRO' | 'EXPERT' }> = {
+  'test-free': { id: 'test-free', email: 'test-free@carrieres-pilot.fr', firstName: 'Alex', lastName: 'Dupont', plan: 'FREE' },
+  'test-pro': { id: 'test-pro', email: 'test-pro@carrieres-pilot.fr', firstName: 'Marie', lastName: 'Bernard', plan: 'PRO' },
+  'test-expert': { id: 'test-expert', email: 'test-expert@carrieres-pilot.fr', firstName: 'Julien', lastName: 'Moreau', plan: 'EXPERT' },
+};
+
 export async function POST(_req: NextRequest) {
   const cookieStore = cookies();
   const oldToken = cookieStore.get('cp_refresh')?.value;
@@ -47,6 +54,17 @@ export async function POST(_req: NextRequest) {
     }
     const accessToken = jwt.sign({ sub: demoUserId }, JWT_SECRET, { expiresIn: '24h' });
     return NextResponse.json({ accessToken, user: DEMO_USER });
+  }
+
+  // Handle test account refresh tokens — no database needed
+  if (oldToken.startsWith('test:')) {
+    const testUserId = oldToken.slice(5);
+    const testUser = TEST_USERS[testUserId];
+    if (!testUser) {
+      return NextResponse.json({ error: 'Compte test invalide' }, { status: 401 });
+    }
+    const accessToken = jwt.sign({ sub: testUserId }, JWT_SECRET, { expiresIn: '24h' });
+    return NextResponse.json({ accessToken, user: { ...testUser, emailVerified: true, onboardingDone: true, skills: [], targetContract: [], targetSectors: [], targetLocations: [] } });
   }
 
   const result = await rotateRefreshToken(oldToken);

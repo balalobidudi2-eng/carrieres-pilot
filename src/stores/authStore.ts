@@ -77,12 +77,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const res = await api.get('/users/me');
       set({ user: res.data, isInitialized: true });
-    } catch {
-      // Clear logged-in cookie to break any potential redirect loop
-      if (typeof document !== 'undefined') {
-        document.cookie = 'cp_logged=; path=/; max-age=0';
+    } catch (error: unknown) {
+      // Only log out if the server explicitly says we are not authenticated
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) {
+        if (typeof document !== 'undefined') {
+          document.cookie = 'cp_logged=; path=/; max-age=0';
+        }
+        set({ user: null, isInitialized: true });
+      } else {
+        // Network / server error — keep current user state, just mark initialized
+        set((state) => ({ isInitialized: true, user: state.user }));
       }
-      set({ user: null, isInitialized: true });
     }
   },
 

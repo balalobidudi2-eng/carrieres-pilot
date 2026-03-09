@@ -7,6 +7,7 @@ export interface PlanLimits {
   job_search: number;
   ai_matching: number;
   auto_apply: number;
+  interview_questions: number;
 }
 
 export interface PlanFeatures {
@@ -15,6 +16,7 @@ export interface PlanFeatures {
   job_search: boolean;
   ai_matching: boolean;
   auto_apply: boolean;
+  interview_questions: boolean;
   email_send: boolean;
   form_automation: boolean;
   advanced_cv_analysis: boolean;
@@ -42,6 +44,7 @@ export const PLANS: Record<string, PlanConfig> = {
       job_search: 10,
       ai_matching: 5,
       auto_apply: 0,
+      interview_questions: 0,
     },
     features: {
       cv_generation: true,
@@ -49,6 +52,7 @@ export const PLANS: Record<string, PlanConfig> = {
       job_search: true,
       ai_matching: true,
       auto_apply: false,
+      interview_questions: false,
       email_send: false,
       form_automation: false,
       advanced_cv_analysis: false,
@@ -67,6 +71,7 @@ export const PLANS: Record<string, PlanConfig> = {
       job_search: 100,
       ai_matching: 50,
       auto_apply: 10,
+      interview_questions: 2,
     },
     features: {
       cv_generation: true,
@@ -74,6 +79,7 @@ export const PLANS: Record<string, PlanConfig> = {
       job_search: true,
       ai_matching: true,
       auto_apply: true,
+      interview_questions: true,
       email_send: true,
       form_automation: true,
       advanced_cv_analysis: false,
@@ -92,6 +98,7 @@ export const PLANS: Record<string, PlanConfig> = {
       job_search: 500,
       ai_matching: 200,
       auto_apply: 100,
+      interview_questions: 10,
     },
     features: {
       cv_generation: true,
@@ -99,6 +106,7 @@ export const PLANS: Record<string, PlanConfig> = {
       job_search: true,
       ai_matching: true,
       auto_apply: true,
+      interview_questions: true,
       email_send: true,
       form_automation: true,
       advanced_cv_analysis: true,
@@ -115,4 +123,5 @@ export const QUOTA_LABELS: Record<keyof PlanLimits, string> = {
   job_search: 'Recherches d\'offres',
   ai_matching: 'Matchings IA',
   auto_apply: 'Candidatures auto',
+  interview_questions: 'Préparations entretien',
 };

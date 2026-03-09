@@ -1,12 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { DEMO_USER_ID } from '@/lib/demo-user';
 
 /** GET /api/applications/stats — dashboard statistics */
 export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
+  // Demo user — return realistic mock data
+  if (userId === DEMO_USER_ID) {
+    return NextResponse.json({
+      totalApplications: 12,
+      responseRate: 42,
+      interviewsCount: 3,
+      pendingCount: 5,
+      byStatus: { TO_SEND: 2, SENT: 3, VIEWED: 2, INTERVIEW_SCHEDULED: 2, INTERVIEW_DONE: 1, OFFER_RECEIVED: 1, REJECTED: 1 },
+      weeklyData: [
+        { week: 'S-3', count: 2 },
+        { week: 'S-2', count: 4 },
+        { week: 'S-1', count: 3 },
+        { week: 'S-0', count: 3 },
+      ],
+    });
+  }
+
+  try {
   const [total, byStatus] = await Promise.all([
     prisma.application.count({ where: { userId } }),
     prisma.application.groupBy({ by: ['status'], where: { userId }, _count: true }),
@@ -46,4 +65,10 @@ export async function GET(req: NextRequest) {
     byStatus: statusMap,
     weeklyData,
   });
+  } catch {
+    return NextResponse.json({
+      totalApplications: 0, responseRate: 0, interviewsCount: 0, pendingCount: 0,
+      byStatus: {}, weeklyData: [{ week: 'S-3', count: 0 }, { week: 'S-2', count: 0 }, { week: 'S-1', count: 0 }, { week: 'S-0', count: 0 }],
+    });
+  }
 }
