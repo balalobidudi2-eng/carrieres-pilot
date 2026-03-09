@@ -47,6 +47,8 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         setAccessToken(null);
+        // Clear the logged-in flag cookie to prevent middleware redirect loop
+        document.cookie = 'cp_logged=; path=/; max-age=0';
         // Only redirect if we're not already on a public page
         if (!window.location.pathname.startsWith('/connexion') && !window.location.pathname.startsWith('/inscription')) {
           window.location.href = '/connexion';

@@ -78,6 +78,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       const res = await api.get('/users/me');
       set({ user: res.data, isInitialized: true });
     } catch {
+      // Clear logged-in cookie to break any potential redirect loop
+      if (typeof document !== 'undefined') {
+        document.cookie = 'cp_logged=; path=/; max-age=0';
+      }
       set({ user: null, isInitialized: true });
     }
   },
