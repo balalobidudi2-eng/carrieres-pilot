@@ -31,9 +31,20 @@ function todayStr(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); // YYYY-MM-DD
 }
 
-/** Fallback usage object when DB is unreachable — allows all actions */
+/** Fallback usage object when DB is unreachable.
+ *  Dev: returns 0 so all actions are allowed.
+ *  Prod: returns a high value so all actions are blocked (fail-safe). */
 function fallbackUsage() {
-  return { cvGeneration: 0, coverLetter: 0, jobSearch: 0, aiMatching: 0, autoApply: 0, interviewQuestions: 0, date: todayStr() };
+  const maxValue = process.env.NODE_ENV === 'production' ? 9999 : 0;
+  return {
+    cvGeneration: maxValue,
+    coverLetter: maxValue,
+    jobSearch: maxValue,
+    aiMatching: maxValue,
+    autoApply: maxValue,
+    interviewQuestions: maxValue,
+    date: todayStr(),
+  };
 }
 
 /** Get or create today's usage record for a user */
