@@ -59,9 +59,13 @@ export async function POST(req: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`;
     const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${emailVerificationToken}`;
-    await sendVerificationEmail(user.email, user.firstName, verifyUrl);
+    const emailResult = await sendVerificationEmail(user.email, user.firstName, verifyUrl);
 
-    return NextResponse.json({ ok: true });
+    // In dev, surface the preview URL so the frontend can show it
+    const devPreviewUrl =
+      process.env.NODE_ENV !== 'production' ? (emailResult.devPreviewUrl ?? verifyUrl) : undefined;
+
+    return NextResponse.json({ ok: true, devPreviewUrl });
   } catch {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }

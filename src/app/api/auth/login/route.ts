@@ -18,6 +18,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email ou mot de passe incorrect' }, { status: 401 });
   }
 
+  // Block login for unverified accounts (admins bypass this check)
+  if (!user.emailVerified && !user.adminLevel) {
+    return NextResponse.json(
+      { error: 'Veuillez vérifier votre adresse email avant de vous connecter.', code: 'EMAIL_NOT_VERIFIED' },
+      { status: 403 },
+    );
+  }
+
   // 30-day account recovery: if deletion was scheduled and hasn't passed, cancel it
   let accountRecovered = false;
   if (user.deletionScheduledAt) {

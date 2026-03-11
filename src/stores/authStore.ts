@@ -55,10 +55,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const res = await api.post('/auth/register', { firstName, lastName, email, password });
-      setAccessToken(res.data.accessToken);
-      const me = await api.get('/users/me');
-      set({ user: me.data, isLoading: false });
-      window.location.href = '/dashboard';
+      set({ isLoading: false });
+      if (res.data.emailPending) {
+        // Account created — user must verify email before logging in
+        let url = `/verifier-email?email=${encodeURIComponent(email)}`;
+        // In dev, pass the preview/verify link so the page can surface it directly
+        if (res.data.devPreviewUrl) {
+          url += `&dev_link=${encodeURIComponent(res.data.devPreviewUrl)}`;
+        }
+        window.location.href = url;
+        return;
+      }
+      // Fallback: should not happen with new backend
+      window.location.href = '/connexion';
     } catch (error) {
       set({ isLoading: false });
       throw error;

@@ -6,12 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Zap, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { fadeInUp, staggerContainer } from '@/lib/animations';
 import { useAuthStore } from '@/stores/authStore';
+import { api } from '@/lib/axios';
 
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -20,10 +22,15 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-export default function ConnexionPage() {
+function ConnexionContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
-  const { login, loginDemo, register: registerUser, isLoading } = useAuthStore();
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendingVerif, setResendingVerif] = useState(false);
+  const { login, loginDemo, isLoading } = useAuthStore();
+  const searchParams = useSearchParams();
+  const justVerified = searchParams.get('verified') === '1';
+  const tokenError = searchParams.get('error');
 
   const {
     register,
@@ -32,10 +39,29 @@ export default function ConnexionPage() {
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
 
   const onSubmit = async (data: LoginForm) => {
+    setUnverifiedEmail(null);
     try {
       await login(data.email, data.password);
+    } catch (error: unknown) {
+      const resp = (error as { response?: { data?: { code?: string } } })?.response;
+      if (resp?.data?.code === 'EMAIL_NOT_VERIFIED') {
+        setUnverifiedEmail(data.email);
+      } else {
+        toast.error('Email ou mot de passe incorrect');
+      }
+    }
+  };
+
+  const handleResendVerif = async () => {
+    if (!unverifiedEmail || resendingVerif) return;
+    setResendingVerif(true);
+    try {
+      await api.post('/auth/verify-email', { email: unverifiedEmail });
+      toast.success('Email de vérification renvoyé !');
     } catch {
-      toast.error('Email ou mot de passe incorrect');
+      toast.error("Impossible d'envoyer l'email. Réessayez.");
+    } finally {
+      setResendingVerif(false);
     }
   };
 
@@ -75,8 +101,38 @@ export default function ConnexionPage() {
           className="bg-white rounded-card border border-[#E2E8F0] p-8"
           style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}
         >
+          {/* Success: just verified */}
+          {justVerified && (
+            <div className="mb-5 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700 font-medium text-center">
+              ✅ Email confirmé — vous pouvez maintenant vous connecter.
+            </div>
+          )}
+          {/* Error: expired link */}
+          {tokenError === 'lien_expire' && (
+            <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 text-center">
+              Ce lien de vérification a expiré. Connectez-vous pour recevoir un nouveau lien.
+            </div>
+          )}
+          {/* Error: Google OAuth not configured */}
+          {tokenError === 'google_not_configured' && (
+            <div className="mb-5 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 text-center">
+              <p className="font-semibold mb-1">Google OAuth non configuré</p>
+              <p className="text-xs">Ajoutez <code className="bg-amber-100 px-1 rounded">GOOGLE_CLIENT_ID</code> et <code className="bg-amber-100 px-1 rounded">GOOGLE_CLIENT_SECRET</code> dans votre fichier <code className="bg-amber-100 px-1 rounded">.env.local</code>.</p>
+            </div>
+          )}
+          {/* Error: other Google errors */}
+          {tokenError && ['google_denied', 'google_error', 'google_state_mismatch', 'google_invalid_response', 'google_email_not_verified'].includes(tokenError) && (
+            <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 text-center">
+              Connexion Google échouée. Réessayez ou utilisez votre email et mot de passe.
+            </div>
+          )}
+
           {/* Google SSO */}
-          <button className="w-full flex items-center justify-center gap-3 border border-[#E2E8F0] rounded-btn px-4 py-3 text-sm font-semibold text-[#1E293B] hover:bg-[#F7F8FC] transition-colors mb-5">
+          <button
+            type="button"
+            onClick={() => { window.location.href = '/api/auth/google'; }}
+            className="w-full flex items-center justify-center gap-3 border border-[#E2E8F0] rounded-btn px-4 py-3 text-sm font-semibold text-[#1E293B] hover:bg-[#F7F8FC] transition-colors mb-5"
+          >
             <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -102,6 +158,24 @@ export default function ConnexionPage() {
             <span className="text-xs text-[#94A3B8]">ou avec votre compte</span>
             <div className="flex-1 h-px bg-[#E2E8F0]" />
           </div>
+
+          {/* Unverified email warning */}
+          {unverifiedEmail && (
+            <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+              <p className="font-medium mb-1">Email non vérifié</p>
+              <p className="text-xs text-amber-700 mb-3">
+                Vérifiez votre boîte de réception et cliquez sur le lien de confirmation.
+              </p>
+              <button
+                type="button"
+                onClick={handleResendVerif}
+                disabled={resendingVerif}
+                className="text-xs font-semibold text-accent hover:underline disabled:opacity-60"
+              >
+                {resendingVerif ? 'Envoi...' : 'Renvoyer l\'email de confirmation →'}
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <Input
@@ -153,5 +227,13 @@ export default function ConnexionPage() {
         </motion.p>
       </motion.div>
     </div>
+  );
+}
+
+export default function ConnexionPage() {
+  return (
+    <Suspense>
+      <ConnexionContent />
+    </Suspense>
   );
 }

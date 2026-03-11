@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 const PROTECTED = ['/dashboard', '/cv', '/lettre', '/offres', '/candidatures', '/entretiens', '/profil', '/abonnement', '/parametres'];
 // Redirect when already authenticated
 const AUTH_ROUTES = ['/connexion', '/inscription'];
+// Public-only routes that authenticated users shouldn't be redirected away from
+const PUBLIC_ONLY_EXCEPTIONS = ['/verifier-email'];
 // Admin routes — require cp_admin_level cookie
 const ADMIN_PREFIX = '/admin';
 
@@ -33,7 +35,7 @@ export function middleware(req: NextRequest) {
   }
 
   // ── Redirect to dashboard if already logged in on auth pages ──────
-  if (AUTH_ROUTES.some((r) => pathname.startsWith(r)) && isLoggedIn) {
+  if (AUTH_ROUTES.some((r) => pathname.startsWith(r)) && isLoggedIn && !PUBLIC_ONLY_EXCEPTIONS.some((r) => pathname.startsWith(r))) {
     const url = req.nextUrl.clone();
     url.pathname = adminLevel ? '/admin/dashboard' : '/dashboard';
     return NextResponse.redirect(url);
@@ -43,5 +45,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/dashboard/:path*', '/cv/:path*', '/lettre/:path*', '/offres/:path*', '/candidatures/:path*', '/entretiens/:path*', '/profil/:path*', '/abonnement/:path*', '/parametres/:path*', '/connexion', '/inscription'],
+  matcher: ['/admin/:path*', '/dashboard/:path*', '/cv/:path*', '/lettre/:path*', '/offres/:path*', '/candidatures/:path*', '/entretiens/:path*', '/profil/:path*', '/abonnement/:path*', '/parametres/:path*', '/connexion', '/inscription', '/verifier-email'],
 };

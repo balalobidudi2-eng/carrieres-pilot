@@ -2,14 +2,31 @@
 
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
+import { setAccessToken } from '@/lib/axios';
 import { Sidebar } from '@/components/shared/Sidebar';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { SupportChat } from '@/components/shared/SupportChat';
+
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; path=/; max-age=0`;
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { fetchMe } = useAuthStore();
 
   useEffect(() => {
+    // After Google OAuth callback the access token arrives via a short-lived cookie
+    const oauthToken = getCookie('cp_access_token');
+    if (oauthToken) {
+      setAccessToken(oauthToken);
+      deleteCookie('cp_access_token');
+    }
     fetchMe();
   }, [fetchMe]);
 

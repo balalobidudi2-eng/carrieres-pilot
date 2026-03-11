@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hashPassword, signAccessToken, createRefreshToken, setRefreshCookie } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth';
 import { sendVerificationEmail } from '@/lib/email-service';
 import crypto from 'crypto';
 
@@ -34,22 +34,29 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Send verification email (fire-and-forget — don't block login on SMTP failure)
+  // Send verification email (awaited so we can return devPreviewUrl to the client)
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`;
   const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${emailVerificationToken}`;
-  sendVerificationEmail(user.email, user.firstName, verifyUrl).then((result) => {
-    if (!result.success) {
-      console.error('[register] ⚠️  Email de vérification non envoyé à', user.email, ':', result.error);
-      console.log('[register] Lien de vérification (backup admin):', verifyUrl);
+
+  let devPreviewUrl: string | undefined;
+  try {
+    const emailResult = await sendVerificationEmail(user.email, user.firstName, verifyUrl);
+    if (!emailResult.success) {
+      console.error('[register] ⚠️  Email non envoyé à', user.email, ':', emailResult.error);
+      console.log('[register] Lien de vérification (backup):', verifyUrl);
     }
-  }).catch((err) => {
+    // In development only — surface the Ethereal preview URL or the direct verify link
+    if (process.env.NODE_ENV !== 'production') {
+      devPreviewUrl = emailResult.devPreviewUrl ?? verifyUrl;
+    }
+  } catch (err) {
     console.error('[register] sendVerificationEmail exception:', err);
-    console.log('[register] Lien de vérification (backup admin):', verifyUrl);
-  });
+    console.log('[register] Lien de vérification (backup):', verifyUrl);
+    if (process.env.NODE_ENV !== 'production') {
+      devPreviewUrl = verifyUrl;
+    }
+  }
 
-  const accessToken = signAccessToken(user.id);
-  const refreshToken = await createRefreshToken(user.id);
-  setRefreshCookie(refreshToken);
-
-  return NextResponse.json({ accessToken, emailVerified: false }, { status: 201 });
+  // Do NOT issue tokens — user must verify email first
+  return NextResponse.json({ emailPending: true, devPreviewUrl }, { status: 201 });
 }
