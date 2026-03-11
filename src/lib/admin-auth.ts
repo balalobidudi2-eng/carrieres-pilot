@@ -5,13 +5,6 @@ import { prisma } from './prisma';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-carrieres-pilot-fallback';
 
-// Mirrors ADMIN_ACCOUNTS in login/route.ts
-const ADMIN_TEST_LEVELS: Record<string, number> = {
-  'admin-l1': 1,
-  'admin-l2': 2,
-  'admin-l3': 3,
-};
-
 export interface AdminAuthContext {
   userId: string;
   adminLevel: number;
@@ -19,7 +12,7 @@ export interface AdminAuthContext {
 
 /**
  * Verify that the caller is an admin with at least `minLevel`.
- * Works for both hardcoded test admin accounts and real DB admins.
+ * Relies on JWT payload adminLevel (set at login) or DB lookup.
  * Throws 'UNAUTHORIZED' or 'FORBIDDEN' on failure.
  */
 export async function requireAdmin(req: NextRequest, minLevel = 1): Promise<AdminAuthContext> {
@@ -35,20 +28,13 @@ export async function requireAdmin(req: NextRequest, minLevel = 1): Promise<Admi
 
   const userId = payload.sub;
 
-  // Hardcoded admin test accounts — no DB required
-  const testLevel = ADMIN_TEST_LEVELS[userId];
-  if (testLevel !== undefined) {
-    if (testLevel < minLevel) throw new Error('FORBIDDEN');
-    return { userId, adminLevel: testLevel };
-  }
-
-  // Admin level embedded in JWT (set at login for real admins)
+  // Admin level embedded in JWT (set at login)
   if (payload.adminLevel !== undefined && payload.adminLevel !== null) {
     if (payload.adminLevel < minLevel) throw new Error('FORBIDDEN');
     return { userId, adminLevel: payload.adminLevel };
   }
 
-  // DB lookup for real admins (most authoritative check)
+  // DB lookup (most authoritative)
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { adminLevel: true },

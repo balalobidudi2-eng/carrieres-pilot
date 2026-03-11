@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { DEMO_USER_ID } from '@/lib/demo-user';
-
-const BYPASS_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
 
 function isDbConnectionError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -19,12 +16,6 @@ function isDbConnectionError(err: unknown): boolean {
 export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
-
-  if (BYPASS_IDS.has(userId)) {
-    return NextResponse.json([
-      { id: 'alert-demo-1', keywords: 'Product Designer', location: 'Paris', frequency: 'daily', isActive: true },
-    ]);
-  }
 
   try {
     const alerts = await prisma.jobAlert.findMany({
@@ -59,13 +50,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Les mots-clés sont requis' }, { status: 400 });
   }
 
-  if (BYPASS_IDS.has(userId)) {
-    return NextResponse.json({
-      ok: true, id: `alert-${Date.now()}`, keywords: keywords.trim(),
-      location: location ?? '', frequency: frequency ?? 'daily', isActive: true,
-    });
-  }
-
   try {
     const alert = await prisma.jobAlert.create({
       data: {
@@ -98,10 +82,6 @@ export async function DELETE(req: NextRequest) {
   const alertId = new URL(req.url).searchParams.get('id');
   if (!alertId) {
     return NextResponse.json({ error: "ID de l'alerte requis" }, { status: 400 });
-  }
-
-  if (BYPASS_IDS.has(userId)) {
-    return NextResponse.json({ ok: true });
   }
 
   try {

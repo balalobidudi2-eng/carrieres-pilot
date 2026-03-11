@@ -2,12 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkQuota, incrementUsage, getUserPlan } from '@/lib/quota-service';
-import { DEMO_USER_ID } from '@/lib/demo-user';
 import OpenAI from 'openai';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
 
 function isDbConnectionError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -83,22 +78,19 @@ Règles :
 Texte du CV :
 ${text}`;
 
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
 export async function POST(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
-  // Demo / test users — skip ALL Prisma calls (quota + DB save)
-  const isDemo = DEMO_IDS.has(userId);
-
-  if (!isDemo) {
-    const plan = await getUserPlan(userId);
-    const quota = await checkQuota(userId, plan, 'cv_generation');
-    if (!quota.allowed) {
-      return NextResponse.json(
-        { error: `Quota atteint (${quota.used}/${quota.max} CV générés aujourd'hui). Passez au plan Pro pour plus.` },
-        { status: 429 },
-      );
-    }
+  const plan = await getUserPlan(userId);
+  const quota = await checkQuota(userId, plan, 'cv_generation');
+  if (!quota.allowed) {
+    return NextResponse.json(
+      { error: `Quota atteint (${quota.used}/${quota.max} CV générés aujourd'hui). Passez au plan Pro pour plus.` },
+      { status: 429 },
+    );
   }
 
   let text: string;
@@ -130,29 +122,6 @@ export async function POST(req: NextRequest) {
 
   if (!text || text.trim().length < 20) {
     return NextResponse.json({ error: 'Contenu du CV trop court ou illisible' }, { status: 400 });
-  }
-
-  // Demo / test users: skip OpenAI + Prisma, return a mock CV immediately
-  if (isDemo) {
-    return NextResponse.json({
-      id: `cv-import-${Date.now()}`,
-      userId,
-      name: name.slice(0, 100),
-      template: 'modern',
-      isDefault: false,
-      content: {
-        personal: { firstName: '', lastName: '', title: '', email: '', phone: '', city: '', linkedin: '' },
-        summary: text.slice(0, 300),
-        experiences: [],
-        education: [],
-        skills: [],
-        languages: [],
-      },
-      truncated: false,
-      truncatedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, { status: 201 });
   }
 
   // Original mode: skip OpenAI, save raw text as the CV summary
@@ -218,6 +187,10 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     if (isDbConnectionError(err)) {
       return NextResponse.json({ error: 'Base de données inaccessible. Réessayez dans quelques instants.' }, { status: 503 });
+    }
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('P2003') || msg.includes('P2025') || msg.includes('Foreign key constraint')) {
+      return NextResponse.json({ error: 'Session expirée, veuillez vous reconnecter.' }, { status: 401 });
     }
     console.error('[POST /api/cv/import] prisma.create', err);
     const message = err instanceof Error ? err.message : 'Erreur serveur';

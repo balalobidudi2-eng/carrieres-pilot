@@ -10,12 +10,13 @@ const FT_API_BASE = 'https://api.francetravail.io/partenaire/offresdemploi/v2';
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
-/** Fetch wrapper with AbortController timeout (default 12s) to avoid serverless hangs */
+/** Fetch wrapper with AbortController timeout (default 12s) to avoid serverless hangs.
+ *  Always sets cache: 'no-store' to prevent Next.js from caching auth tokens or API responses. */
 async function fetchFT(url: string, options: RequestInit = {}, timeoutMs = 12_000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
   } finally {
     clearTimeout(id);
   }

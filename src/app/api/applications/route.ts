@@ -43,6 +43,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'company et jobTitle requis' }, { status: 400 });
   }
 
+  // Duplicate check — detect by jobUrl OR company+jobTitle
+  try {
+    const orClauses: Record<string, unknown>[] = [
+      { company: { equals: company, mode: 'insensitive' }, jobTitle: { equals: jobTitle, mode: 'insensitive' } },
+    ];
+    if (jobUrl) orClauses.unshift({ jobUrl });
+    const duplicate = await prisma.application.findFirst({ where: { userId, OR: orClauses } });
+    if (duplicate) {
+      return NextResponse.json({ error: 'Vous avez déjà postulé à cette offre.' }, { status: 409 });
+    }
+  } catch { /* non-blocking */ }
+
   // Quota check — FREE: 3 manual applications/day
   try {
     const plan = await getUserPlan(userId);

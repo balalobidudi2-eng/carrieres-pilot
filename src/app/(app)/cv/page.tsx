@@ -100,8 +100,12 @@ export default function CVPage() {
   });
 
   const handleDownloadPDF = (cv: CV) => {
+    // If CV was imported with an original file, we'd download it directly.
+    // For AI-generated CVs, open the editor and auto-trigger print dialog.
     setSelectedCV(cv);
-    setTimeout(() => toast('💡 Utilisez Imprimer (Ctrl+P) dans l\'éditeur pour exporter en PDF', { duration: 5000 }), 400);
+    setTimeout(() => {
+      window.print();
+    }, 800);
   };
 
   if (selectedCV) {

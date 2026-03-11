@@ -11,6 +11,13 @@ import {
   CreditCard,
   ExternalLink,
   Shield,
+  BarChart2,
+  FileText,
+  Mail,
+  Search,
+  Bot,
+  Send,
+  Mic,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -53,8 +60,8 @@ const PLANS: Plan[] = [
   {
     id: 'PRO',
     name: 'Pro',
-    price: 19.99,
-    priceAnnual: 15.99,
+    price: 14.99,
+    priceAnnual: 11.99,
     description: 'Pour maximiser vos chances de décrocher le job idéal',
     icon: Sparkles,
     color: '#7C3AED',
@@ -64,9 +71,10 @@ const PLANS: Plan[] = [
       '5 lettres IA / jour',
       '100 recherches / jour',
       '50 matchings IA / jour',
-      '10 candidatures auto / jour',
+      '50 candidatures auto / jour',
       'Envoi email SMTP',
       'Automatisation formulaires',
+      'Préparation entretiens IA',
       'Support prioritaire',
     ],
     limits: { cvs: 5, letters: 5, applications: 100 },
@@ -75,8 +83,8 @@ const PLANS: Plan[] = [
   {
     id: 'EXPERT',
     name: 'Expert',
-    price: 34.99,
-    priceAnnual: 27.99,
+    price: 29.99,
+    priceAnnual: 23.99,
     description: 'La solution complète pour les profils exigeants',
     icon: Crown,
     color: '#D97706',
@@ -88,6 +96,7 @@ const PLANS: Plan[] = [
       '100 candidatures auto / jour',
       'Envoi email SMTP',
       'Automatisation formulaires',
+      'Préparation entretiens IA illimitée',
       'Analytics avancées + Support dédié',
     ],
     limits: { cvs: 50, letters: 50, applications: 500 },
@@ -98,6 +107,18 @@ const PLANS: Plan[] = [
 export default function AbonnementPage() {
   const { user } = useAuthStore();
   const currentPlan = (user?.plan ?? 'FREE') as 'FREE' | 'PRO' | 'EXPERT';
+
+  const { data: usageData } = useQuery({
+    queryKey: ['user-usage'],
+    queryFn: () => api.get('/users/usage').then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: historyData } = useQuery({
+    queryKey: ['user-usage-history'],
+    queryFn: () => api.get('/users/usage/history').then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: billingStatus } = useQuery({
     queryKey: ['billing-status'],
@@ -254,6 +275,93 @@ export default function AbonnementPage() {
       <motion.div variants={fadeInUp} className="text-center text-xs text-[#94A3B8] flex items-center justify-center gap-1.5">
         <Shield size={12} />
         Paiement sécurisé par Stripe · Annulation à tout moment · Données 100% privées
+      </motion.div>
+
+      {/* Quota tracking dashboard */}
+      <motion.div variants={fadeInUp} className="space-y-5">
+        <div className="flex items-center gap-2">
+          <BarChart2 size={18} className="text-accent" />
+          <h2 className="font-heading text-lg font-bold text-[#1E293B]">Vos quotas journaliers</h2>
+        </div>
+
+        {/* Progress bars */}
+        <div className="bg-white rounded-card border border-[#E2E8F0] p-5 space-y-4" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+          {[
+            { key: 'cvGeneration', limitKey: 'cv_generation', label: 'CV générés', icon: FileText, color: 'bg-cyan-500' },
+            { key: 'coverLetter', limitKey: 'cover_letter', label: 'Lettres de motivation', icon: Mail, color: 'bg-pink-500' },
+            { key: 'jobSearch', limitKey: 'job_search', label: "Recherches d'offres", icon: Search, color: 'bg-indigo-500' },
+            { key: 'aiMatching', limitKey: 'ai_matching', label: 'Matchings IA', icon: Bot, color: 'bg-violet-500' },
+            { key: 'autoApply', limitKey: 'auto_apply', label: 'Candidatures auto', icon: Send, color: 'bg-amber-500' },
+            { key: 'interviewQuestions', limitKey: 'interview_questions', label: 'Simulations entretien', icon: Mic, color: 'bg-emerald-500' },
+          ].map(({ key, limitKey, label, icon: Icon, color }) => {
+            const limit = usageData?.limits?.dailyLimits?.[limitKey] ?? 0;
+            const used = usageData?.daily?.[key] ?? 0;
+            const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+            const remaining = limit > 0 ? Math.max(0, limit - used) : 0;
+            return (
+              <div key={key}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-[#1E293B]">
+                    <Icon size={14} className="text-[#64748B]" />
+                    {label}
+                  </div>
+                  <div className="text-xs text-[#64748B]">
+                    {limit > 0 ? (
+                      <><span className="font-semibold text-[#1E293B]">{used}</span> / {limit} · <span className={remaining === 0 ? 'text-red-500 font-semibold' : 'text-emerald-600 font-semibold'}>{remaining} restants</span></>
+                    ) : (
+                      <span className="text-[#CBD5E1]">Non disponible sur ce plan</span>
+                    )}
+                  </div>
+                </div>
+                <div className="h-2 bg-[#F1F5F9] rounded-full overflow-hidden">
+                  {limit > 0 && (
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-red-400' : color}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Usage history calendar */}
+        {historyData?.history?.length > 0 && (
+          <div className="bg-white rounded-card border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+            <div className="px-5 py-3 border-b border-[#F1F5F9]">
+              <h3 className="text-sm font-semibold text-[#1E293B]">Historique d&apos;utilisation (30 derniers jours)</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#F8FAFC] border-b border-[#F1F5F9]">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#64748B]">Date</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-[#64748B]">CV</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-[#64748B]">Lettres</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-[#64748B]">Recherches</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-[#64748B]">Matching</th>
+                    <th className="text-center px-3 py-3 text-xs font-semibold text-[#64748B]">Auto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(historyData.history as { date: string; cvGeneration: number; coverLetter: number; jobSearch: number; aiMatching: number; autoApply: number }[]).map((row) => (
+                    <tr key={row.date} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC] transition-colors">
+                      <td className="px-4 py-2.5 text-[#64748B] text-xs font-medium">
+                        {new Date(row.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                      </td>
+                      {[row.cvGeneration, row.coverLetter, row.jobSearch, row.aiMatching, row.autoApply].map((v, i) => (
+                        <td key={i} className="text-center px-3 py-2.5">
+                          {v > 0 ? <span className="text-xs font-semibold text-[#1E293B]">{v}</span> : <span className="text-[#CBD5E1] text-xs">—</span>}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

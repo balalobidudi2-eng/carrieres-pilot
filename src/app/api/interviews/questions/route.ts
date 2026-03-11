@@ -3,7 +3,6 @@ import { requireAuth } from '@/lib/auth';
 import { generateInterviewQuestions } from '@/lib/openai-service';
 import { getUserPlan } from '@/lib/quota-service';
 import { PLANS } from '@/lib/plans';
-import { DEMO_USER_ID } from '@/lib/demo-user';
 
 /** POST /api/interviews/questions — generate interview questions via AI */
 export async function POST(req: NextRequest) {
@@ -11,7 +10,7 @@ export async function POST(req: NextRequest) {
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
   // Plan check — interview questions are PRO/EXPERT only
-  const plan = userId === DEMO_USER_ID ? 'PRO' : await getUserPlan(userId).catch(() => 'FREE');
+  const plan = await getUserPlan(userId).catch(() => 'FREE');
   const limit = PLANS[plan]?.dailyLimits?.interview_questions ?? 0;
   if (limit === 0) {
     return NextResponse.json(

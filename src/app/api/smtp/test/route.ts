@@ -2,17 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import nodemailer from 'nodemailer';
-import { DEMO_USER_ID } from '@/lib/demo-user';
 import { decryptPassword } from '@/lib/smtp';
 
 /** POST /api/smtp/test — sends a test email to the authenticated user */
 export async function POST(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
-
-  if (userId === DEMO_USER_ID) {
-    return NextResponse.json({ error: 'Envoi de test non disponible en mode démo' }, { status: 403 });
-  }
 
   // Resolve SMTP config: user DB config takes precedence over env vars
   let smtpHost: string | undefined;

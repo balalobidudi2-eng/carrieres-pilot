@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { DEMO_USER_ID } from '@/lib/demo-user';
 
 /** GET /api/billing/status — current subscription status */
 export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
-
-  // Demo user — return mock subscription data
-  if (userId === DEMO_USER_ID) {
-    return NextResponse.json({ plan: 'PRO', hasSubscription: false, hasCustomer: false, isDemo: true });
-  }
 
   try {
     const user = await prisma.user.findUnique({

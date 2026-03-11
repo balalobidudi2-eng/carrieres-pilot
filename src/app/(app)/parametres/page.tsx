@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +18,7 @@ import {
   Globe,
   Moon,
   Sun,
+  MessageSquare,
   Mail,
   CheckCircle,
   XCircle,
@@ -44,6 +45,155 @@ const passwordSchema = z
   });
 
 type PasswordForm = z.infer<typeof passwordSchema>;
+
+function ContactSection() {
+  const qc = useQueryClient();
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [showForm, setShowForm] = useState(false);
+
+  const { data: myMessages = [] } = useQuery<{
+    id: string;
+    subject: string;
+    message: string;
+    adminReply: string | null;
+    repliedAt: string | null;
+    replyRead: boolean;
+    createdAt: string;
+  }[]>({
+    queryKey: ['my-support-messages'],
+    queryFn: () => api.get('/support/contact').then((r) => r.data),
+    staleTime: 60 * 1000,
+  });
+
+  const hasUnreadReply = myMessages.some((m) => m.adminReply && !m.replyRead);
+
+  const contactMutation = useMutation({
+    mutationFn: () => api.post('/support/contact', { subject, message }),
+    onSuccess: () => {
+      toast.success('Message envoyé à l\'équipe CarrièrePilot !');
+      setSubject('');
+      setMessage('');
+      setShowForm(false);
+      qc.invalidateQueries({ queryKey: ['my-support-messages'] });
+    },
+    onError: () => toast.error('Erreur lors de l\'envoi. Veuillez réessayer.'),
+  });
+
+  return (
+    <motion.section
+      variants={fadeInUp}
+      className="bg-white rounded-card border border-[#E2E8F0] overflow-hidden"
+      style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}
+    >
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center relative">
+            <MessageSquare size={16} className="text-accent" />
+            {hasUnreadReply && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+            )}
+          </div>
+          <div>
+            <h2 className="font-heading font-semibold text-[#1E293B]">Support &amp; messages</h2>
+            <p className="text-xs text-[#94A3B8]">Historique de vos échanges avec l&apos;équipe CarrièrePilot</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-accent border border-accent/30 rounded-btn hover:bg-accent/5 transition-colors"
+        >
+          <MessageSquare size={13} />
+          Nouveau ticket
+        </button>
+      </div>
+
+      {/* New ticket form */}
+      {showForm && (
+        <div className="p-6 border-b border-[#E2E8F0] space-y-4 bg-[#F8FAFC]">
+          <div>
+            <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Sujet</label>
+            <input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="ex: Problème de candidature automatique"
+              className="w-full px-3 py-2.5 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Message</label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={4}
+              placeholder="Décrivez votre problème ou votre demande en détail…"
+              className="w-full px-3 py-2.5 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 resize-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => contactMutation.mutate()}
+              loading={contactMutation.isPending}
+              disabled={!subject.trim() || !message.trim()}
+            >
+              <MessageSquare size={14} />
+              Envoyer
+            </Button>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>Annuler</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Message history */}
+      <div className="divide-y divide-[#E2E8F0]">
+        {myMessages.length === 0 && !showForm && (
+          <div className="px-6 py-10 text-center">
+            <MessageSquare size={32} className="mx-auto text-[#CBD5E1] mb-2" />
+            <p className="text-sm text-[#94A3B8]">Aucun message envoyé pour le moment.</p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="mt-3 text-sm font-semibold text-accent hover:underline"
+            >
+              Contacter le support →
+            </button>
+          </div>
+        )}
+        {myMessages.map((msg) => (
+          <div key={msg.id} className="p-5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[#1E293B]">{msg.subject}</p>
+                <p className="text-xs text-[#94A3B8] mt-0.5">
+                  {new Date(msg.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+              {msg.adminReply ? (
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium shrink-0">Répondu</span>
+              ) : (
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium shrink-0">En attente</span>
+              )}
+            </div>
+            {/* User's message */}
+            <div className="bg-[#F8FAFC] rounded-lg p-3">
+              <p className="text-xs font-semibold text-[#94A3B8] mb-1">Votre message</p>
+              <p className="text-sm text-[#475569] leading-relaxed">{msg.message}</p>
+            </div>
+            {/* Admin reply */}
+            {msg.adminReply && (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
+                <p className="text-xs font-semibold text-emerald-700 mb-1">
+                  Réponse de l&apos;équipe CarrièrePilot
+                  {msg.repliedAt && ` — ${new Date(msg.repliedAt).toLocaleDateString('fr-FR')}`}
+                </p>
+                <p className="text-sm text-[#475569] leading-relaxed whitespace-pre-wrap">{msg.adminReply}</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </motion.section>
+  );
+}
 
 export default function ParametresPage() {
   const { user, logout } = useAuthStore();
@@ -316,6 +466,9 @@ export default function ParametresPage() {
           </div>
         </div>
       </motion.section>
+
+      {/* ── Contacter le support ──────────────────────────────── */}
+      <ContactSection />
 
       {/* ── Déconnexion + Suppression ──────────────────────────── */}
       <motion.section

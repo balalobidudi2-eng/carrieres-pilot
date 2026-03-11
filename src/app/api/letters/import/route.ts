@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { DEMO_USER_ID } from '@/lib/demo-user';
-
-const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
 
 async function extractText(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -69,22 +66,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Contenu de la lettre trop court' }, { status: 400 });
   }
 
-  // Demo / test users — skip DB
-  if (DEMO_IDS.has(userId)) {
-    const mock = {
-      id: `imported-${Date.now()}`,
-      userId,
-      name: `${jobTitle}${company ? ` — ${company}` : ''}`,
-      jobTitle,
-      companyName: company,
-      content: content.trim(),
-      tone: 'professional',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    return NextResponse.json(mock, { status: 201 });
-  }
-
   try {
     const letter = await prisma.coverLetter.create({
       data: {
@@ -101,6 +82,9 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : '';
     if (msg.includes("Can't reach database") || msg.includes('P1001') || msg.includes('localhost')) {
       return NextResponse.json({ error: 'Base de données inaccessible. Réessayez dans quelques instants.' }, { status: 503 });
+    }
+    if (msg.includes('P2003') || msg.includes('P2025') || msg.includes('Foreign key constraint')) {
+      return NextResponse.json({ error: 'Session expirée, veuillez vous reconnecter.' }, { status: 401 });
     }
     console.error('[POST /api/letters/import] prisma.create', err);
     return NextResponse.json({ error: msg || 'Erreur serveur' }, { status: 500 });

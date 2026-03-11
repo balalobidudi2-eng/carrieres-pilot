@@ -3,7 +3,6 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateCoverLetter } from '@/lib/openai-service';
 import { checkQuota, incrementUsage, getUserPlan } from '@/lib/quota-service';
-import { DEMO_USER, DEMO_USER_ID } from '@/lib/demo-user';
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -13,11 +12,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'OPENAI_API_KEY non configurée' }, { status: 503 });
   }
 
-  // Quota check — skip Prisma for demo user
-  const plan = userId === DEMO_USER_ID ? 'PRO' : await getUserPlan(userId).catch(() => 'FREE');
-  const quota = userId === DEMO_USER_ID
-    ? { allowed: true, used: 0, max: 5, remaining: 5 }
-    : await checkQuota(userId, plan, 'cover_letter');
+  // Quota check
+  const plan = await getUserPlan(userId).catch(() => 'FREE');
+  const quota = await checkQuota(userId, plan, 'cover_letter');
   if (!quota.allowed) {
     return NextResponse.json(
       { error: `Limite quotidienne atteinte (${quota.max} tâches/jour). Passez au plan supérieur pour continuer.` },
@@ -30,13 +27,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Champs requis manquants' }, { status: 400 });
   }
 
-  // Load user profile — use virtual profile for demo user
-  const user = userId === DEMO_USER_ID
-    ? { firstName: DEMO_USER.firstName, lastName: DEMO_USER.lastName, currentTitle: DEMO_USER.currentTitle, location: DEMO_USER.location, phone: DEMO_USER.phone, bio: DEMO_USER.bio, skills: DEMO_USER.skills, targetSectors: DEMO_USER.targetSectors }
-    : await prisma.user.findUnique({
-        where: { id: userId },
-        select: { firstName: true, lastName: true, currentTitle: true, location: true, phone: true, bio: true, skills: true, targetSectors: true },
-      });
+  // Load user profile
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { firstName: true, lastName: true, currentTitle: true, location: true, phone: true, bio: true, skills: true, targetSectors: true },
+  });
 
   const content = await generateCoverLetter({
     jobTitle,
@@ -47,9 +42,7 @@ export async function POST(req: NextRequest) {
   });
 
   // Increment usage after successful generation
-  if (userId !== DEMO_USER_ID) {
-    await incrementUsage(userId, 'cover_letter');
-  }
+  await incrementUsage(userId, 'cover_letter');
 
   return NextResponse.json({ content });
 }

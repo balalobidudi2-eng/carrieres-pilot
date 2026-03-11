@@ -11,17 +11,34 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { host, port, user: smtpUser, password, from } = body as Record<string, string>;
 
-  if (!host || !smtpUser || !password) {
-    return NextResponse.json({ error: 'Hôte, email et mot de passe sont requis' }, { status: 400 });
+  if (!host || !smtpUser) {
+    return NextResponse.json({ error: 'Hôte et email sont requis' }, { status: 400 });
   }
 
-  const smtpPassEnc = encryptPassword(password);
   const smtpPort = port ? parseInt(port, 10) : 587;
+
+  // If no new password provided, keep the existing one
+  const updateData: Record<string, unknown> = {
+    smtpHost: host,
+    smtpPort,
+    smtpUser,
+    smtpFrom: from || smtpUser,
+  };
+
+  if (password?.trim()) {
+    updateData.smtpPassEnc = encryptPassword(password);
+  } else {
+    // Check existing password exists
+    const existing = await prisma.user.findUnique({ where: { id: userId }, select: { smtpPassEnc: true } });
+    if (!existing?.smtpPassEnc) {
+      return NextResponse.json({ error: 'Un mot de passe est requis pour la première configuration' }, { status: 400 });
+    }
+  }
 
   try {
     await prisma.user.update({
       where: { id: userId },
-      data: { smtpHost: host, smtpPort, smtpUser, smtpPassEnc, smtpFrom: from || smtpUser },
+      data: updateData,
     });
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

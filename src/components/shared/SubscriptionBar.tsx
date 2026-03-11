@@ -8,15 +8,15 @@ import { api } from '@/lib/axios';
 const LABEL_MAP: Record<string, string> = {
   cv_generation: 'CV',
   cover_letter: 'Lettres',
-  job_search: 'Recherches IA',
+  job_search: 'Candidatures auto',
   ai_matching: 'Matchings IA',
   auto_apply: 'Candidatures IA',
   application: 'Candidatures',
   interview_questions: 'Entretiens IA',
 };
 
-/** Quota keys shown in the sidebar (CV, Lettres, Recherches) */
-const VISIBLE_KEYS = ['cv_generation', 'cover_letter', 'job_search'];
+/** Quota keys shown in the sidebar (CV, Lettres, Candidatures auto) */
+const VISIBLE_KEYS = ['cv_generation', 'cover_letter', 'auto_apply'];
 
 interface UsageItem {
   key: string;

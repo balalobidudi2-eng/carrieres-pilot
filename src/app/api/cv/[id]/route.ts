@@ -12,6 +12,30 @@ function isDbConnectionError(err: unknown): boolean {
   );
 }
 
+/** GET /api/cv/[id] — get a single CV */
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  let userId: string;
+  try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
+
+  // Fake IDs — return minimal response
+  if (/^cv(-import)?-\d+$/.test(params.id)) {
+    return NextResponse.json({ error: 'CV local non persisté en base' }, { status: 404 });
+  }
+
+  try {
+    const cv = await prisma.cV.findFirst({ where: { id: params.id, userId } });
+    if (!cv) return NextResponse.json({ error: 'CV introuvable' }, { status: 404 });
+    return NextResponse.json(cv);
+  } catch (err: unknown) {
+    if (isDbConnectionError(err)) {
+      return NextResponse.json({ error: 'Base de données inaccessible' }, { status: 503 });
+    }
+    console.error('[GET /api/cv/id]', err);
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 /** PATCH /api/cv/[id] — update CV content */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   let userId: string;

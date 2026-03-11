@@ -1,15 +1,7 @@
 import { prisma } from './prisma';
 import { PLANS, type PlanLimits } from './plans';
-import { DEMO_USER_ID, DEMO_USER } from './demo-user';
 
 export type QuotaKey = keyof PlanLimits;
-
-// Test accounts that bypass the database entirely
-const TEST_PLANS: Record<string, string> = {
-  'test-free': 'FREE',
-  'test-pro': 'PRO',
-  'test-expert': 'EXPERT',
-};
 
 function isDbError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -56,7 +48,6 @@ function fallbackUsage() {
 
 /** Get or create today's usage record for a user */
 async function getOrCreateUsage(userId: string) {
-  if (userId in TEST_PLANS) return fallbackUsage(); // no DB for test accounts (avoids FK violation)
   const date = todayStr();
   try {
     return await prisma.dailyUsage.upsert({
@@ -103,7 +94,6 @@ export async function checkQuota(
 
 /** Increment usage counter after a successful action */
 export async function incrementUsage(userId: string, action: QuotaKey): Promise<void> {
-  if (userId === DEMO_USER_ID || userId in TEST_PLANS) return; // no-op for virtual users
   const date = todayStr();
   const field = QUOTA_DB_FIELD[action];
   try {
@@ -144,10 +134,8 @@ export async function getDailyUsageSummary(userId: string, plan: string) {
   };
 }
 
-/** Resolve the plan name for a user (handles demo user without DB) */
+/** Resolve the plan name for a user */
 export async function getUserPlan(userId: string): Promise<string> {
-  if (userId === DEMO_USER_ID) return DEMO_USER.plan;
-  if (userId in TEST_PLANS) return TEST_PLANS[userId];
   try {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
     return user?.plan ?? 'FREE';

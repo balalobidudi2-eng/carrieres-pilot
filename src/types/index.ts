@@ -54,6 +54,14 @@ export interface AdminStats {
   totalLetters: number;
   totalApplications: number;
   totalSearches: number;
+  recentSignups?: {
+    id: string; firstName: string; lastName: string; email: string;
+    plan: string; createdAt: string; lastLoginAt: string | null;
+  }[];
+  recentApplications?: {
+    id: string; jobTitle: string; company: string; status: string; createdAt: string;
+    user: { email: string; firstName: string; lastName: string };
+  }[];
 }
 
 export interface AuthTokens {

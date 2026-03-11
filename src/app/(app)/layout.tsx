@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { Sidebar } from '@/components/shared/Sidebar';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { SupportChat } from '@/components/shared/SupportChat';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { fetchMe } = useAuthStore();
@@ -21,6 +22,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <SupportChat />
     </div>
   );
 }

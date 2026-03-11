@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Destinataire, sujet et corps requis' }, { status: 400 });
   }
 
-  const result = await sendApplicationEmail({ to, fromName, fromEmail, subject, body, cvAttachmentUrl });
+  const result = await sendApplicationEmail({ to, fromName, fromEmail, subject, body, cvAttachmentUrl, userId });
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 500 });

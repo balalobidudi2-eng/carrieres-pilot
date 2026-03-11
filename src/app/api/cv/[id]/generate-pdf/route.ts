@@ -24,7 +24,7 @@ export async function POST(
   const isFakeId = /^cv(-import)?-\d+$/.test(params.id);
 
   let cvName = 'Curriculum Vitae';
-  let content: Record<string, unknown>;
+  let content: Record<string, unknown> | undefined;
 
   if (isFakeId) {
     if (!bodyContent) return NextResponse.json({ error: 'Contenu manquant pour un CV local' }, { status: 400 });
@@ -40,7 +40,7 @@ export async function POST(
       else return NextResponse.json({ error: 'Base de donn\u00e9es inaccessible' }, { status: 503 });
     }
 
-    if (!content!) {
+    if (!content) {
       if (!cv || cv.userId !== userId) {
         if (bodyContent) { content = bodyContent; }
         else return NextResponse.json({ error: 'CV non trouve' }, { status: 404 });
@@ -50,6 +50,7 @@ export async function POST(
       }
     }
   }
+  if (!content) return NextResponse.json({ error: 'CV non trouvé' }, { status: 404 });
   try {
   const p = (content.personal ?? {}) as Record<string, string | undefined>;
   const summary = content.summary as string | undefined;

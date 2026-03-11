@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import { generateCoverLetter } from '@/lib/openai-service';
-import { DEMO_USER_ID } from '@/lib/demo-user';
 
-const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
-
-/** Returns true if the error is a Prisma DB connection failure (e.g. localhost dev) */
+/** Returns true if the error is a Prisma DB connection failure */
 function isDbConnectionError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : '';
   return msg.includes("Can't reach database") || msg.includes('P1001') || msg.includes('localhost:5432');
@@ -16,14 +13,6 @@ function isDbConnectionError(err: unknown): boolean {
 export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
-
-  // Demo / test users — return mock letters
-  if (DEMO_IDS.has(userId)) {
-    return NextResponse.json([
-      { id: 'demo-letter-1', name: 'Lead UX Designer — Stripe', jobTitle: 'Lead UX Designer', companyName: 'Stripe', tone: 'professional', content: 'Madame, Monsieur,\n\nJe vous adresse ma candidature pour le poste de Lead UX Designer au sein de Stripe...\n\nCordialement,\nSophie Martin', createdAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(), updatedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() },
-      { id: 'demo-letter-2', name: 'Product Designer — Figma', jobTitle: 'Product Designer', companyName: 'Figma', tone: 'dynamic', content: 'Madame, Monsieur,\n\nPassionnée par le design produit, je candidate avec enthousiasme pour rejoindre l\'équipe Figma...\n\nCordialement,\nSophie Martin', createdAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(), updatedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString() },
-    ]);
-  }
 
   try {
     const letters = await prisma.coverLetter.findMany({
@@ -45,22 +34,6 @@ export async function POST(req: NextRequest) {
   let body: { name?: string; jobTitle?: string; company?: string; content?: string; tone?: string };
   try { body = await req.json(); } catch { body = {}; }
 
-  // Demo / test users — skip DB
-  if (DEMO_IDS.has(userId)) {
-    const mock = {
-      id: `letter-${Date.now()}`,
-      userId,
-      name: body.name ?? `${body.jobTitle ?? 'Poste'} — ${body.company ?? 'Entreprise'}`,
-      jobTitle: body.jobTitle ?? null,
-      companyName: body.company ?? null,
-      content: body.content ?? '',
-      tone: body.tone ?? 'professional',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    return NextResponse.json(mock, { status: 201 });
-  }
-
   try {
     const letter = await prisma.coverLetter.create({
       data: {
@@ -75,13 +48,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(letter, { status: 201 });
   } catch (err: unknown) {
     if (isDbConnectionError(err)) {
-      return NextResponse.json({
-        id: `letter-${Date.now()}`, userId,
-        name: body.name ?? `${body.jobTitle ?? 'Poste'} — ${body.company ?? 'Entreprise'}`,
-        jobTitle: body.jobTitle ?? null, companyName: body.company ?? null,
-        content: body.content ?? '', tone: body.tone ?? 'professional',
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }, { status: 201 });
+      return NextResponse.json({ error: 'Base de données inaccessible. Réessayez dans quelques instants.' }, { status: 503 });
+    }
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('P2003') || msg.includes('P2025') || msg.includes('Foreign key constraint')) {
+      return NextResponse.json({ error: 'Session expirée, veuillez vous reconnecter.' }, { status: 401 });
     }
     console.error('[POST /api/letters]', err);
     const message = err instanceof Error ? err.message : 'Erreur serveur';

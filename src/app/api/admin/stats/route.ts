@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
       totalLetters,
       totalApplications,
       totalSearches,
+      recentSignups,
+      recentApplications,
     ] = await Promise.all([
       prisma.user.count({ where: { deletionScheduledAt: null } }),
       prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo }, deletionScheduledAt: null } }),
@@ -31,13 +33,30 @@ export async function GET(req: NextRequest) {
       prisma.cV.count(),
       prisma.coverLetter.count(),
       prisma.application.count(),
-      // Sum jobSearch usage across all users
       prisma.dailyUsage.aggregate({ _sum: { jobSearch: true } }).then((r) => r._sum.jobSearch ?? 0),
+      prisma.user.findMany({
+        where: { deletionScheduledAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { id: true, firstName: true, lastName: true, email: true, plan: true, createdAt: true, lastLoginAt: true },
+      }),
+      prisma.application.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          jobTitle: true,
+          company: true,
+          status: true,
+          createdAt: true,
+          user: { select: { email: true, firstName: true, lastName: true } },
+        },
+      }),
     ]);
 
     const planDist = { FREE: 0, PRO: 0, EXPERT: 0 };
     for (const g of planDistribution) {
-      planDist[g.plan] = g._count.id;
+      planDist[g.plan as keyof typeof planDist] = g._count.id;
     }
 
     return NextResponse.json({
@@ -49,6 +68,8 @@ export async function GET(req: NextRequest) {
       totalLetters,
       totalApplications,
       totalSearches,
+      recentSignups,
+      recentApplications,
     });
   } catch (err) {
     console.error('[admin/stats]', err);

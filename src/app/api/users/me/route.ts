@@ -1,45 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, revokeUserTokens, clearAuthCookies } from '@/lib/auth';
-import { DEMO_USER, DEMO_USER_ID } from '@/lib/demo-user';
-
-const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
-
-// Must mirror TEST_ACCOUNTS from login/route.ts
-const TEST_USERS: Record<string, { id: string; email: string; firstName: string; lastName: string; plan: 'FREE' | 'PRO' | 'EXPERT' }> = {
-  'test-free': { id: 'test-free', email: 'test-free@carrieres-pilot.fr', firstName: 'Alex', lastName: 'Dupont', plan: 'FREE' },
-  'test-pro': { id: 'test-pro', email: 'test-pro@carrieres-pilot.fr', firstName: 'Marie', lastName: 'Bernard', plan: 'PRO' },
-  'test-expert': { id: 'test-expert', email: 'test-expert@carrieres-pilot.fr', firstName: 'Julien', lastName: 'Moreau', plan: 'EXPERT' },
-};
-
-// Must mirror ADMIN_ACCOUNTS from login/route.ts
-const ADMIN_USERS: Record<string, { id: string; email: string; firstName: string; lastName: string; adminLevel: number }> = {
-  'admin-l1': { id: 'admin-l1', email: 'admin1@carrieres-pilot.fr', firstName: 'Admin', lastName: 'Niveau 1', adminLevel: 1 },
-  'admin-l2': { id: 'admin-l2', email: 'admin2@carrieres-pilot.fr', firstName: 'Admin', lastName: 'Niveau 2', adminLevel: 2 },
-  'admin-l3': { id: 'admin-l3', email: 'superadmin@carrieres-pilot.fr', firstName: 'Super', lastName: 'Admin', adminLevel: 3 },
-};
 
 /** GET /api/users/me — current user profile */
 export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
-
-  // Return demo user immediately without hitting DB
-  if (userId === DEMO_USER_ID) {
-    return NextResponse.json(DEMO_USER);
-  }
-
-  // Return test account user immediately without hitting DB
-  const testUser = TEST_USERS[userId];
-  if (testUser) {
-    return NextResponse.json({ ...testUser, avatar: null, phone: null, linkedinUrl: null, currentTitle: null, location: null, bio: null, targetSalary: null, targetContract: [], targetSectors: [], targetLocations: [], skills: [], emailVerified: true, onboardingDone: false, createdAt: new Date().toISOString() });
-  }
-
-  // Return admin account user immediately without hitting DB
-  const adminUser = ADMIN_USERS[userId];
-  if (adminUser) {
-    return NextResponse.json({ ...adminUser, plan: 'FREE' as const, avatar: null, phone: null, linkedinUrl: null, currentTitle: null, location: null, bio: null, targetSalary: null, targetContract: [], targetSectors: [], targetLocations: [], skills: [], emailVerified: true, onboardingDone: true, createdAt: new Date().toISOString() });
-  }
 
   try {
     const user = await prisma.user.findUnique({
@@ -49,10 +15,14 @@ export async function GET(req: NextRequest) {
         phone: true, linkedinUrl: true, currentTitle: true, location: true,
         bio: true, targetSalary: true, targetContract: true, targetSectors: true,
         targetLocations: true, skills: true, plan: true, emailVerified: true,
-        onboardingDone: true, createdAt: true,
+        onboardingDone: true, createdAt: true, adminLevel: true,
+        languages: true, portfolio: true, availability: true, objectives: true,
+        experiences: true, formations: true,
+        workMode: true, companySize: true, companyType: true,
+        travelWillingness: true, relocationWillingness: true,
       },
     });
-    if (!user) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
+    if (!user) return NextResponse.json({ error: 'Session expirée' }, { status: 401 });
     return NextResponse.json(user);
   } catch (err: unknown) {
     console.error('[GET /api/users/me]', err);
@@ -72,6 +42,8 @@ export async function PATCH(req: NextRequest) {
     'firstName', 'lastName', 'phone', 'linkedinUrl', 'currentTitle',
     'location', 'bio', 'targetSalary', 'targetContract', 'targetSectors',
     'targetLocations', 'skills', 'onboardingDone', 'avatar',
+    'languages', 'portfolio', 'availability', 'objectives', 'experiences', 'formations',
+    'workMode', 'companySize', 'companyType', 'travelWillingness', 'relocationWillingness',
   ];
   const data: Record<string, unknown> = {};
   for (const key of allowed) {
@@ -101,12 +73,6 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
-
-  // Demo / test — just log out, no real deletion
-  if (DEMO_IDS.has(userId)) {
-    clearAuthCookies();
-    return NextResponse.json({ ok: true });
-  }
 
   let reason: string | undefined;
   try {

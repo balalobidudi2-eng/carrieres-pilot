@@ -54,6 +54,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const body = await req.json();
+
+  // Super Admin cannot change their own admin role (self-protection)
+  if ('adminLevel' in body && ctx.userId === params.id) {
+    return NextResponse.json({ error: 'Le Super Admin ne peut pas modifier son propre rôle.' }, { status: 403 });
+  }
+
   // Level 2 can suspend (set deletionScheduledAt), modify plan, reset emailVerified
   // Level 3 can also change adminLevel
   const allowed: Record<string, unknown> = {};
@@ -72,10 +78,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (body.suspended) allowed.deletionReason = 'Suspendu par un administrateur';
     else allowed.deletionReason = null;
   }
-  if ('adminLevel' in body && ctx.adminLevel >= 3) {
-    // Only L3 can change adminLevel; null removes admin
+  if ('adminLevel' in body && ctx.adminLevel >= 4) {
+    // Only Super Admin (L4) can change admin levels; null removes admin
     const lvl = body.adminLevel === null ? null : parseInt(body.adminLevel);
-    if (lvl === null || (lvl >= 1 && lvl <= 3)) {
+    if (lvl === null || (lvl >= 1 && lvl <= 4)) {
+      // Level 4 can only be granted to the designated super admin email
+      if (lvl === 4) {
+        const target = await prisma.user.findUnique({ where: { id: params.id }, select: { email: true } });
+        if (target?.email !== 'ghilesaimeur951@gmail.com') {
+          return NextResponse.json({ error: 'Le rôle Super Admin ne peut être accordé qu\'à l\'administrateur désigné.' }, { status: 403 });
+        }
+        // Enforce single L4: demote any existing L4
+        await prisma.user.updateMany({
+          where: { adminLevel: 4, id: { not: params.id } },
+          data: { adminLevel: 3 },
+        });
+      }
       allowed.adminLevel = lvl;
     }
   }

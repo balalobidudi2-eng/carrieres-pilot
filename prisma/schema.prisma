@@ -52,9 +52,22 @@ model User {
   targetSectors   String[] @default([])
   targetLocations String[] @default([])
   skills          String[] @default([])
+  languages       String[] @default([])
+  portfolio       String?
+  availability    String?
+  objectives      String?
+  experiences     Json?
+  formations      Json?
+  workMode        String?
+  companySize     String?
+  companyType     String?
+  travelWillingness    Boolean?
+  relocationWillingness Boolean?
   plan            Plan     @default(FREE)
-  emailVerified   Boolean  @default(false)
-  onboardingDone  Boolean  @default(false)
+  emailVerified            Boolean   @default(false)
+  emailVerificationToken   String?   @unique
+  emailVerificationExpiry  DateTime?
+  onboardingDone           Boolean   @default(false)
 
   stripeCustomerId     String? @unique
   stripeSubscriptionId String?
@@ -84,7 +97,8 @@ model User {
   refreshTokens RefreshToken[]
   dailyUsages   DailyUsage[]
   jobAlerts     JobAlert[]
-  savedOffers   SavedOffer[]
+  savedOffers      SavedOffer[]
+  contactMessages  ContactMessage[]
 
   @@map("users")
 }
@@ -225,4 +239,22 @@ model SavedOffer {
   @@unique([userId, offerId])
   @@index([userId])
   @@map("saved_offers")
+}
+
+// ─── Contact Messages ─────────────────────────────────────────────────────────
+
+model ContactMessage {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject      String
+  message      String
+  read         Boolean   @default(false)
+  adminReply   String?
+  repliedAt    DateTime?
+  replyRead    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@map("contact_messages")
 }

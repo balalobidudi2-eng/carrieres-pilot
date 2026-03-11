@@ -99,7 +99,7 @@ Dans l'attente de votre retour, je vous adresse, Madame, Monsieur, mes sincères
 ${fullName || 'Le candidat'}`,
       },
     ],
-    max_tokens: 1200,
+    max_tokens: 900,
     temperature: 0.72,
   });
   return res.choices[0]?.message?.content?.trim() ?? '';
@@ -142,14 +142,23 @@ Réponds avec un tableau JSON :
 
 // ─── Interview Feedback ─────────────────────────────────────────────
 
-export async function generateInterviewFeedback(question: string, answer: string): Promise<string> {
+export async function generateInterviewFeedback(question: string, answer: string): Promise<{
+  score: number;
+  clarity: number;
+  structure: number;
+  relevance: number;
+  technical: number;
+  summary: string;
+}> {
   const res = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       {
         role: 'system',
-        content:
-          'Tu es un coach carrière expert. Analyse la réponse du candidat à une question d\'entretien. Sois constructif mais honnête. Format : Points forts / Points à améliorer / Score (1-10) / Conseil.',
+        content: `Tu es un coach carrière expert. Analyse la réponse du candidat à une question d'entretien. 
+Réponds UNIQUEMENT en JSON strict avec ce format :
+{"score":8,"clarity":7,"structure":8,"relevance":9,"technical":7,"summary":"Feedback constructif en 2-3 phrases."}
+Scores de 1 à 10. Sois honnête et constructif.`,
       },
       {
         role: 'user',
@@ -158,8 +167,18 @@ export async function generateInterviewFeedback(question: string, answer: string
     ],
     max_tokens: 400,
     temperature: 0.6,
+    response_format: { type: 'json_object' },
   });
-  return res.choices[0]?.message?.content?.trim() ?? '';
+  const raw = res.choices[0]?.message?.content?.trim() ?? '{}';
+  const parsed = JSON.parse(raw);
+  return {
+    score: parsed.score ?? 5,
+    clarity: parsed.clarity ?? 5,
+    structure: parsed.structure ?? 5,
+    relevance: parsed.relevance ?? 5,
+    technical: parsed.technical ?? 5,
+    summary: parsed.summary ?? raw,
+  };
 }
 
 // ─── Offer Matching ──────────────────────────────────────────────────

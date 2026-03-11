@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useForm, Controller } from 'react-hook-form';
@@ -48,11 +48,39 @@ const schema = z.object({
   targetLocations: z.array(z.string()).optional(),
   targetSectors: z.array(z.string()).optional(),
   skills: z.array(z.string()).optional(),
+  portfolio: z.preprocess(
+    (v) => typeof v === 'string' && v && !v.startsWith('http') ? 'https://' + v : v,
+    z.string().url('URL invalide').optional().or(z.literal('')),
+  ),
+  availability: z.string().optional(),
+  objectives: z.string().optional(),
+  languages: z.array(z.string()).optional(),
+  workMode: z.string().optional(),
+  companySize: z.string().optional(),
+  companyType: z.string().optional(),
+  travelWillingness: z.boolean().optional(),
+  relocationWillingness: z.boolean().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
 const CONTRACT_OPTIONS = ['CDI', 'CDD', 'Stage', 'Alternance', 'Freelance', 'Mission'];
 const SECTOR_OPTIONS = ['Tech', 'Design', 'Marketing', 'Finance', 'Santé', 'Retail', 'RH', 'Commercial', 'Logistique'];
+
+interface Experience {
+  id: string;
+  company: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+}
+interface Formation {
+  id: string;
+  school: string;
+  degree: string;
+  year: string;
+  description: string;
+}
 
 function TagInput({
   values,
@@ -93,8 +121,14 @@ function TagInput({
 export default function ProfilPage() {
   const { user, updateUser } = useAuthStore();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'info' | 'preferences' | 'competences'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'preferences' | 'competences' | 'parcours'>('info');
   const letterFileRef = useRef<HTMLInputElement>(null);
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [formations, setFormations] = useState<Formation[]>([]);
+  const experiencesRef = useRef<Experience[]>([]);
+  const formationsRef = useRef<Formation[]>([]);
+  experiencesRef.current = experiences;
+  formationsRef.current = formations;
 
   const { data: profile } = useQuery({
     queryKey: ['me'],
@@ -157,14 +191,32 @@ export default function ProfilPage() {
       targetLocations: profile?.targetLocations ?? [],
       targetSectors: profile?.targetSectors ?? [],
       skills: profile?.skills ?? [],
+      portfolio: profile?.portfolio ?? '',
+      availability: profile?.availability ?? '',
+      objectives: profile?.objectives ?? '',
+      languages: profile?.languages ?? [],
+      workMode: profile?.workMode ?? '',
+      companySize: profile?.companySize ?? '',
+      companyType: profile?.companyType ?? '',
+      travelWillingness: profile?.travelWillingness ?? false,
+      relocationWillingness: profile?.relocationWillingness ?? false,
     },
   });
+
+  useEffect(() => {
+    if (profile?.experiences && Array.isArray(profile.experiences)) {
+      setExperiences(profile.experiences as Experience[]);
+    }
+    if (profile?.formations && Array.isArray(profile.formations)) {
+      setFormations(profile.formations as Formation[]);
+    }
+  }, [profile]);
 
   const saveMutation = useMutation({
     mutationFn: (data: FormData) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { email: _email, ...payload } = data;
-      return api.patch('/users/me', payload).then((r) => r.data);
+      return api.patch('/users/me', { ...payload, experiences: experiencesRef.current, formations: formationsRef.current }).then((r) => r.data);
     },
     onSuccess: (data) => {
       updateUser(data);
@@ -204,6 +256,7 @@ export default function ProfilPage() {
     { id: 'info', label: 'Informations', icon: User },
     { id: 'preferences', label: 'Préférences', icon: Target },
     { id: 'competences', label: 'Compétences', icon: GraduationCap },
+    { id: 'parcours', label: 'Parcours', icon: Briefcase },
   ] as const;
 
   return (
@@ -363,6 +416,92 @@ export default function ProfilPage() {
                 )}
               />
             </div>
+
+            {/* Work mode */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Mode de travail souhaité</p>
+              <div className="flex flex-wrap gap-2">
+                {['Présentiel', 'Hybride', 'Télétravail'].map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setValue('workMode', watch('workMode') === mode ? '' : mode, { shouldDirty: true })}
+                    className={`px-3 py-1.5 rounded-btn text-xs font-semibold border transition-all ${
+                      watch('workMode') === mode
+                        ? 'bg-accent/10 border-accent/40 text-accent'
+                        : 'bg-[#F7F8FC] border-[#E2E8F0] text-[#64748B] hover:border-accent/30'
+                    }`}
+                  >
+                    {mode === 'Présentiel' ? '🏢 ' : mode === 'Hybride' ? '🔄 ' : '🏠 '}{mode}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Company size */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Taille d&apos;entreprise souhaitée</p>
+              <div className="flex flex-wrap gap-2">
+                {['TPE / Startup', 'PME (10–250)', 'ETI (250–5k)', 'Grand groupe (+5k)'].map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setValue('companySize', watch('companySize') === size ? '' : size, { shouldDirty: true })}
+                    className={`px-3 py-1.5 rounded-btn text-xs font-semibold border transition-all ${
+                      watch('companySize') === size
+                        ? 'bg-primary/10 border-primary/40 text-primary'
+                        : 'bg-[#F7F8FC] border-[#E2E8F0] text-[#64748B] hover:border-primary/30'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Company type */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Type d&apos;entreprise</p>
+              <div className="flex flex-wrap gap-2">
+                {['Startup', 'Corporate', 'ESN / Conseil', 'Agence', 'ONG / Asso', 'Secteur public'].map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setValue('companyType', watch('companyType') === type ? '' : type, { shouldDirty: true })}
+                    className={`px-3 py-1.5 rounded-btn text-xs font-semibold border transition-all ${
+                      watch('companyType') === type
+                        ? 'bg-violet-100 border-violet-300 text-violet-700'
+                        : 'bg-[#F7F8FC] border-[#E2E8F0] text-[#64748B] hover:border-violet-200'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mobility */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Mobilité</p>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...register('travelWillingness')}
+                    className="w-4 h-4 rounded border-[#CBD5E1] text-accent focus:ring-accent/30"
+                  />
+                  <span className="text-sm text-[#475569]">Disponible pour des déplacements fréquents</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    {...register('relocationWillingness')}
+                    className="w-4 h-4 rounded border-[#CBD5E1] text-accent focus:ring-accent/30"
+                  />
+                  <span className="text-sm text-[#475569]">Ouvert(e) à la mobilité géographique (déménagement)</span>
+                </label>
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -379,7 +518,12 @@ export default function ProfilPage() {
               )}
             />
             <div className="flex flex-wrap gap-2 pt-2">
-              {['React', 'TypeScript', 'Node.js', 'Figma', 'UX Design', 'Agile', 'SQL', 'Python'].map((s) => {
+              {[
+                'React', 'TypeScript', 'Node.js', 'Figma', 'UX Design', 'Agile', 'SQL', 'Python',
+                'Communication', 'Leadership', 'Management de projet', 'Analyse de données',
+                'Négociation', 'Présentation', 'Pensée stratégique', 'Résolution de problèmes',
+                'Excel', 'Power BI', 'Salesforce', 'Jira', 'Docker', 'AWS',
+              ].map((s) => {
                 const skills = watch('skills') ?? [];
                 if (skills.includes(s)) return null;
                 return (
@@ -393,6 +537,115 @@ export default function ProfilPage() {
                   </button>
                 );
               })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* PARCOURS TAB */}
+        {activeTab === 'parcours' && (
+          <motion.div variants={fadeInUp} className="space-y-6">
+            {/* Portfolio + Disponibilité + Objectifs + Langues */}
+            <div className="bg-white rounded-card border border-[#E2E8F0] p-6 space-y-5" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+              <h3 className="font-heading font-semibold text-[#1E293B] text-base border-b border-[#E2E8F0] pb-3">Informations complémentaires</h3>
+
+              <Input label="Portfolio / Site web" {...register('portfolio')} error={errors.portfolio?.message} placeholder="https://mon-portfolio.com" leftIcon={<Globe size={14} />} />
+
+              <div>
+                <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Disponibilité</label>
+                <select {...register('availability')} className="w-full p-3 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 bg-white">
+                  <option value="">Sélectionner…</option>
+                  <option value="Immédiate">Immédiate</option>
+                  <option value="1 mois">1 mois</option>
+                  <option value="3 mois">3 mois</option>
+                  <option value="6 mois">6 mois</option>
+                  <option value="Non disponible">Non disponible</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Objectifs professionnels</label>
+                <textarea {...register('objectives')} rows={3} placeholder="Décrivez vos objectifs de carrière…" className="w-full p-3 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 resize-none" />
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-[#1E293B] mb-2">Langues</p>
+                <Controller
+                  name="languages"
+                  control={control}
+                  render={({ field }) => (
+                    <TagInput values={field.value ?? []} onChange={field.onChange} placeholder="ex: Français, Anglais, Espagnol (Entrée pour valider)…" />
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Expériences */}
+            <div className="bg-white rounded-card border border-[#E2E8F0] p-6 space-y-4" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+                <h3 className="font-heading font-semibold text-[#1E293B] text-base">Expériences professionnelles</h3>
+                <button
+                  type="button"
+                  onClick={() => setExperiences((prev) => [...prev, { id: String(Date.now()), company: '', title: '', startDate: '', endDate: '', description: '' }])}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline"
+                >
+                  <Plus size={14} /> Ajouter
+                </button>
+              </div>
+              {experiences.length === 0 && <p className="text-sm text-[#94A3B8]">Aucune expérience ajoutée.</p>}
+              {experiences.map((exp, i) => (
+                <div key={exp.id} className="border border-[#E2E8F0] rounded-btn p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-[#1E293B]">Expérience {i + 1}</span>
+                    <button type="button" onClick={() => setExperiences((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600 transition-colors">
+                      <X size={15} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label="Entreprise" value={exp.company} onChange={(e) => setExperiences((prev) => prev.map((x, idx) => idx === i ? { ...x, company: e.target.value } : x))} placeholder="ex: Apple" />
+                    <Input label="Poste" value={exp.title} onChange={(e) => setExperiences((prev) => prev.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} placeholder="ex: Software Engineer" />
+                    <Input label="Date de début" value={exp.startDate} onChange={(e) => setExperiences((prev) => prev.map((x, idx) => idx === i ? { ...x, startDate: e.target.value } : x))} placeholder="ex: Jan 2022" />
+                    <Input label="Date de fin" value={exp.endDate} onChange={(e) => setExperiences((prev) => prev.map((x, idx) => idx === i ? { ...x, endDate: e.target.value } : x))} placeholder="ex: Déc 2023 / En cours" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Description</label>
+                    <textarea value={exp.description} onChange={(e) => setExperiences((prev) => prev.map((x, idx) => idx === i ? { ...x, description: e.target.value } : x))} rows={2} placeholder="Responsabilités et réalisations clés…" className="w-full p-3 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 resize-none" />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Formations */}
+            <div className="bg-white rounded-card border border-[#E2E8F0] p-6 space-y-4" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+                <h3 className="font-heading font-semibold text-[#1E293B] text-base">Formations</h3>
+                <button
+                  type="button"
+                  onClick={() => setFormations((prev) => [...prev, { id: String(Date.now()), school: '', degree: '', year: '', description: '' }])}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline"
+                >
+                  <Plus size={14} /> Ajouter
+                </button>
+              </div>
+              {formations.length === 0 && <p className="text-sm text-[#94A3B8]">Aucune formation ajoutée.</p>}
+              {formations.map((form, i) => (
+                <div key={form.id} className="border border-[#E2E8F0] rounded-btn p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-[#1E293B]">Formation {i + 1}</span>
+                    <button type="button" onClick={() => setFormations((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600 transition-colors">
+                      <X size={15} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label="École / Université" value={form.school} onChange={(e) => setFormations((prev) => prev.map((x, idx) => idx === i ? { ...x, school: e.target.value } : x))} placeholder="ex: École Polytechnique" />
+                    <Input label="Diplôme" value={form.degree} onChange={(e) => setFormations((prev) => prev.map((x, idx) => idx === i ? { ...x, degree: e.target.value } : x))} placeholder="ex: Master Informatique" />
+                    <Input label="Année" value={form.year} onChange={(e) => setFormations((prev) => prev.map((x, idx) => idx === i ? { ...x, year: e.target.value } : x))} placeholder="ex: 2021" className="col-span-2" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Description</label>
+                    <textarea value={form.description} onChange={(e) => setFormations((prev) => prev.map((x, idx) => idx === i ? { ...x, description: e.target.value } : x))} rows={2} placeholder="Spécialités, projets notables…" className="w-full p-3 border border-[#E2E8F0] rounded-btn text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 resize-none" />
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}

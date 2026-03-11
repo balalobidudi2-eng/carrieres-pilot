@@ -27,6 +27,9 @@ import {
   MapPin,
   GripVertical,
   Mail,
+  Filter,
+  ArrowUpDown,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -39,12 +42,24 @@ import type { Application, ApplicationStatus } from '@/types';
 const COLUMNS: { id: ApplicationStatus; label: string; color: string }[] = [
   { id: 'TO_SEND', label: 'À envoyer', color: '#94A3B8' },
   { id: 'SENT', label: 'Envoyée', color: '#3B82F6' },
-  { id: 'VIEWED', label: 'Vue', color: '#F59E0B' },
-  { id: 'INTERVIEW_SCHEDULED', label: 'Entretien planifié', color: '#8B5CF6' },
+  { id: 'VIEWED', label: 'Vue', color: '#8B5CF6' },
+  { id: 'INTERVIEW_SCHEDULED', label: 'Entretien planifié', color: '#F59E0B' },
   { id: 'INTERVIEW_DONE', label: 'Entretien fait', color: '#06B6D4' },
   { id: 'OFFER_RECEIVED', label: 'Offre reçue', color: '#10B981' },
   { id: 'REJECTED', label: 'Refusée', color: '#EF4444' },
 ];
+
+const STATUS_COLOR: Record<ApplicationStatus, string> = {
+  TO_SEND: '#94A3B8',
+  SENT: '#3B82F6',
+  VIEWED: '#8B5CF6',
+  INTERVIEW_SCHEDULED: '#F59E0B',
+  INTERVIEW_DONE: '#06B6D4',
+  OFFER_RECEIVED: '#10B981',
+  ACCEPTED: '#10B981',
+  REJECTED: '#EF4444',
+  WITHDRAWN: '#94A3B8',
+};
 
 export default function CandidaturesPage() {
   const qc = useQueryClient();
@@ -55,6 +70,8 @@ export default function CandidaturesPage() {
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailApp, setEmailApp] = useState<Application | null>(null);
   const [emailForm, setEmailForm] = useState({ to: '', subject: '', body: '' });
+  const [filterStatus, setFilterStatus] = useState<ApplicationStatus | 'ALL'>('ALL');
+  const [sortBy, setSortBy] = useState<'date' | 'company' | 'status'>('date');
 
   const { data: applications = [], isLoading } = useQuery<Application[]>({
     queryKey: ['applications'],
@@ -145,7 +162,19 @@ export default function CandidaturesPage() {
     }
   };
 
-  const byStatus = (status: ApplicationStatus) => applications.filter((a) => a.status === status);
+  const sortApps = (apps: Application[]) => {
+    return [...apps].sort((a, b) => {
+      if (sortBy === 'date') return new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime();
+      if (sortBy === 'company') return a.company.localeCompare(b.company);
+      if (sortBy === 'status') return a.status.localeCompare(b.status);
+      return 0;
+    });
+  };
+
+  const byStatus = (status: ApplicationStatus) => {
+    const filtered = filterStatus === 'ALL' ? applications : applications.filter((a) => a.status === filterStatus);
+    return sortApps(filtered.filter((a) => a.status === status));
+  };
 
   return (
     <div className="space-y-4">
@@ -160,6 +189,48 @@ export default function CandidaturesPage() {
           <Plus size={16} />
           Nouvelle candidature
         </Button>
+      </div>
+
+      {/* Filter + sort bar */}
+      <div className="flex flex-wrap items-center gap-2 pb-1">
+        {/* Status filter chips */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-xs text-[#94A3B8] flex items-center gap-1 mr-1"><Filter size={11} /> Filtrer :</span>
+          <button
+            onClick={() => setFilterStatus('ALL')}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${filterStatus === 'ALL' ? 'bg-[#1E293B] text-white' : 'bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0]'}`}
+          >
+            Toutes ({applications.length})
+          </button>
+          {COLUMNS.map((col) => {
+            const count = applications.filter((a) => a.status === col.id).length;
+            if (count === 0) return null;
+            return (
+              <button
+                key={col.id}
+                onClick={() => setFilterStatus(filterStatus === col.id ? 'ALL' : col.id)}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${filterStatus === col.id ? 'text-white' : 'bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0]'}`}
+                style={filterStatus === col.id ? { background: col.color } : {}}
+              >
+                {col.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sort dropdown */}
+        <div className="flex items-center gap-1 ml-auto">
+          <ArrowUpDown size={11} className="text-[#94A3B8]" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'date' | 'company' | 'status')}
+            className="text-xs border border-[#E2E8F0] rounded-btn px-2 py-1 bg-white text-[#475569] focus:outline-none focus:border-accent"
+          >
+            <option value="date">Trier par date</option>
+            <option value="company">Trier par entreprise</option>
+            <option value="status">Trier par statut</option>
+          </select>
+        </div>
       </div>
 
       {/* Kanban board */}
@@ -329,48 +400,92 @@ function ApplicationCard({ app, isDragging = false, onEmailClick }: { app: Appli
     opacity: isSortableDragging ? 0.4 : 1,
   };
 
+  const statusColor = STATUS_COLOR[app.status] ?? '#94A3B8';
+  const initials = app.company.slice(0, 2).toUpperCase();
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-white rounded-xl border border-[#E2E8F0] p-3 cursor-grab active:cursor-grabbing ${
-        isDragging ? 'shadow-xl ring-2 ring-accent/30 rotate-2' : 'hover:border-accent/40'
-      } transition-colors`}
+      className={`bg-white rounded-xl border border-[#E2E8F0] overflow-hidden cursor-grab active:cursor-grabbing ${
+        isDragging ? 'shadow-xl ring-2 ring-accent/30 rotate-1' : 'hover:border-accent/30 hover:shadow-sm'
+      } transition-all`}
     >
-      <div className="flex items-start justify-between gap-1 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
+      {/* Colored top accent bar */}
+      <div className="h-0.5 w-full" style={{ background: statusColor }} />
+
+      <div className="p-3">
+        {/* Header row */}
+        <div className="flex items-start gap-2 mb-2">
+          {/* Drag handle */}
           <div
             {...attributes}
             {...listeners}
-            className="text-[#CBD5E1] hover:text-[#94A3B8] shrink-0 cursor-grab"
+            className="text-[#CBD5E1] hover:text-[#94A3B8] shrink-0 mt-0.5 cursor-grab"
           >
             <GripVertical size={13} />
           </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-xs text-[#1E293B] truncate">{app.company}</p>
-            <p className="text-xs text-[#64748B] truncate">{app.jobTitle}</p>
+
+          {/* Company avatar */}
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+            style={{ background: statusColor + '33', color: statusColor }}
+          >
+            {initials}
           </div>
+
+          {/* Title + company */}
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-xs text-[#1E293B] leading-tight truncate">{app.jobTitle}</p>
+            <p className="text-[11px] text-[#64748B] truncate mt-0.5">{app.company}</p>
+          </div>
+
+          <button className="p-0.5 text-[#CBD5E1] hover:text-[#64748B] shrink-0">
+            <MoreHorizontal size={13} />
+          </button>
         </div>
-        <button className="p-0.5 text-[#CBD5E1] hover:text-[#64748B] shrink-0">
-          <MoreHorizontal size={13} />
-        </button>
+
+        {/* Meta row */}
+        <div className="flex items-center gap-2 text-[10px] text-[#94A3B8] pl-5 flex-wrap">
+          <span className="flex items-center gap-1">
+            <Calendar size={9} />
+            {new Date(app.appliedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+          </span>
+          {app.salary && (
+            <span className="font-semibold text-[#475569]">{app.salary}</span>
+          )}
+          {app.contactEmail && (
+            <span className="flex items-center gap-1 truncate max-w-[120px]">
+              <Mail size={9} />
+              {app.contactEmail}
+            </span>
+          )}
+        </div>
+
+        {/* Next step */}
+        {app.nextStep && (
+          <div className="mt-2 pl-5 flex items-start gap-1 text-[10px]">
+            <span className="shrink-0 text-accent font-semibold">→</span>
+            <span className="text-[#475569] line-clamp-1">{app.nextStep}</span>
+          </div>
+        )}
+
+        {/* Notes */}
+        {app.notes && !app.nextStep && (
+          <p className="mt-2 pl-5 text-[10px] text-[#94A3B8] line-clamp-2 italic">{app.notes}</p>
+        )}
+
+        {/* Email CTA for TO_SEND */}
+        {app.status === 'TO_SEND' && onEmailClick && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onEmailClick(app); }}
+            className="mt-2 ml-5 flex items-center gap-1 text-[10px] text-accent hover:text-accent/80 font-semibold transition-colors"
+          >
+            <Mail size={11} />
+            Envoyer par email
+          </button>
+        )}
       </div>
-      <div className="flex items-center gap-2 text-[10px] text-[#94A3B8]">
-        <Calendar size={10} />
-        {new Date(app.appliedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-      </div>
-      {app.notes && (
-        <p className="mt-2 text-[10px] text-[#94A3B8] line-clamp-2 italic">{app.notes}</p>
-      )}
-      {app.status === 'TO_SEND' && onEmailClick && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onEmailClick(app); }}
-          className="mt-2 flex items-center gap-1 text-[10px] text-accent hover:text-accent/80 font-semibold transition-colors"
-        >
-          <Mail size={11} />
-          Envoyer par email
-        </button>
-      )}
     </div>
   );
 }

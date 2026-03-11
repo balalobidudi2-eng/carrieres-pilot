@@ -11,6 +11,9 @@ import {
   FileText,
   Zap,
   Shield,
+  MessageSquare,
+  TrendingDown,
+  BarChart2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
@@ -19,15 +22,19 @@ const navItems = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard', minLevel: 1 },
   { href: '/admin/utilisateurs', icon: Users, label: 'Utilisateurs', minLevel: 1 },
   { href: '/admin/abonnements', icon: CreditCard, label: 'Abonnements', minLevel: 1 },
+  { href: '/admin/messages', icon: MessageSquare, label: 'Messages support', minLevel: 1 },
   { href: '/admin/activite', icon: Activity, label: 'Activité', minLevel: 1 },
-  { href: '/admin/parametres', icon: Settings, label: 'Paramètres système', minLevel: 3 },
+  { href: '/admin/couts', icon: TrendingDown, label: 'Analyse des coûts', minLevel: 2 },
+  { href: '/admin/statistiques', icon: BarChart2, label: 'Statistiques', minLevel: 3 },
   { href: '/admin/logs', icon: FileText, label: 'Logs système', minLevel: 3 },
+  { href: '/admin/parametres', icon: Settings, label: 'Paramètres système', minLevel: 4 },
 ];
 
 const LEVEL_LABELS: Record<number, string> = {
   1: 'Admin Niveau 1',
   2: 'Admin Niveau 2',
-  3: 'Super Admin',
+  3: 'Admin Niveau 3',
+  4: 'Super Admin',
 };
 
 export function AdminSidebar() {

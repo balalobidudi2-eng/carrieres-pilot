@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
-import { DEMO_USER_ID } from '@/lib/demo-user';
-
-const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
-
-const DEMO_CVS = [
-  { id: 'demo-cv-1', name: 'CV Product Designer', template: 'modern', atsScore: 82, content: {}, createdAt: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(), updatedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() },
-];
 
 /** GET /api/cv — list user's CVs */
 export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
-
-  if (DEMO_IDS.has(userId)) return NextResponse.json(DEMO_CVS);
 
   try {
     const cvs = await prisma.cV.findMany({
@@ -52,12 +43,10 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : '';
     if (msg.includes("Can't reach database") || msg.includes('P1001') || msg.includes('localhost:5432')) {
-      return NextResponse.json({
-        id: `cv-${Date.now()}`, userId,
-        name: body.name ?? 'Mon CV', template: body.template ?? 'modern',
-        content: body.content ?? {}, atsScore: null,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }, { status: 201 });
+      return NextResponse.json({ error: 'Base de données inaccessible. Réessayez dans quelques instants.' }, { status: 503 });
+    }
+    if (msg.includes('P2003') || msg.includes('P2025') || msg.includes('Foreign key constraint')) {
+      return NextResponse.json({ error: 'Session expirée, veuillez vous reconnecter.' }, { status: 401 });
     }
     console.error('[POST /api/cv]', err);
     return NextResponse.json({ error: msg || 'Erreur serveur' }, { status: 500 });

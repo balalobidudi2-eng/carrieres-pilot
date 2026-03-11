@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/axios';
 import { useAuthStore } from '@/stores/authStore';
-import { Search, ChevronLeft, ChevronRight, Shield, Ban, CheckCircle } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Shield, Ban, CheckCircle, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { AdminUser } from '@/types';
 
@@ -14,7 +14,7 @@ const PLAN_COLORS: Record<string, string> = {
   EXPERT: 'bg-violet-100 text-violet-600',
 };
 
-const LEVEL_LABELS: Record<number, string> = { 1: 'L1', 2: 'L2', 3: 'SA' };
+const LEVEL_LABELS: Record<number, string> = { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'SA' };
 
 export default function AdminUsersPage() {
   const { user: adminUser } = useAuthStore();
@@ -142,7 +142,7 @@ export default function AdminUsersPage() {
                     </td>
                     {adminLevel >= 2 && (
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {u.deletionScheduledAt ? (
                             <Button
                               size="sm"
@@ -161,6 +161,26 @@ export default function AdminUsersPage() {
                             >
                               <Ban size={13} className="mr-1" /> Suspendre
                             </Button>
+                          )}
+                          {/* Admin level selector for Super Admin (L4) only */}
+                          {adminLevel >= 4 && (
+                            <div className="relative">
+                              <select
+                                value={u.adminLevel ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? null : parseInt(e.target.value);
+                                  patchMutation.mutate({ id: u.id, patch: { adminLevel: val } });
+                                }}
+                                className="h-7 pl-2 pr-6 text-xs border border-[#E2E8F0] dark:border-white/10 rounded-lg bg-white dark:bg-[#0D1B2A] text-[#475569] dark:text-white/60 focus:outline-none focus:border-amber-400 appearance-none cursor-pointer"
+                              >
+                                <option value="">Aucun rôle admin</option>
+                                <option value="1">Admin L1</option>
+                                <option value="2">Admin L2</option>
+                                <option value="3">Admin L3</option>
+                                <option value="4">Super Admin</option>
+                              </select>
+                              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none" />
+                            </div>
                           )}
                         </div>
                       </td>

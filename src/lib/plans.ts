@@ -65,14 +65,14 @@ export const PLANS: Record<string, PlanConfig> = {
   PRO: {
     id: 'PRO',
     name: 'Pro',
-    price: 19.99,
-    priceAnnual: 15.99,
+    price: 14.99,
+    priceAnnual: 11.99,
     dailyLimits: {
       cv_generation: 5,
       cover_letter: 5,
       job_search: 100,
       ai_matching: 50,
-      auto_apply: 10,
+      auto_apply: 50,
       interview_questions: 2,
       application: 50,
     },
@@ -93,8 +93,8 @@ export const PLANS: Record<string, PlanConfig> = {
   EXPERT: {
     id: 'EXPERT',
     name: 'Expert',
-    price: 34.99,
-    priceAnnual: 27.99,
+    price: 29.99,
+    priceAnnual: 23.99,
     dailyLimits: {
       cv_generation: 50,
       cover_letter: 50,

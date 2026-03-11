@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { checkQuota, incrementUsage, getUserPlan } from '@/lib/quota-service';
-import { DEMO_USER_ID } from '@/lib/demo-user';
-
-const BYPASS_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
 
 // This route calls OpenAI server-side — the API key never reaches the browser.
 export async function POST(req: NextRequest) {
@@ -18,11 +15,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Quota check (skip DB for demo/test users)
+  // Quota check
   const plan = await getUserPlan(userId);
-  const quota = BYPASS_IDS.has(userId)
-    ? { allowed: true, used: 0, max: 5, remaining: 5 }
-    : await checkQuota(userId, plan, 'cv_generation');
+  const quota = await checkQuota(userId, plan, 'cv_generation');
   if (!quota.allowed) {
     return NextResponse.json(
       { error: `Limite quotidienne atteinte (${quota.max} tâches/jour). Passez au plan supérieur pour continuer.` },
@@ -78,9 +73,7 @@ ${JSON.stringify(content ?? {}, null, 2)}`,
     const text = data.choices?.[0]?.message?.content?.trim() ?? '';
 
     // Increment usage after successful generation
-    if (!BYPASS_IDS.has(userId)) {
-      await incrementUsage(userId, 'cv_generation');
-    }
+    await incrementUsage(userId, 'cv_generation');
 
     return NextResponse.json({ summary: text }, { status: 200 });
   } catch {

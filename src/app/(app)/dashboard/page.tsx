@@ -21,6 +21,8 @@ import {
   Search,
   ArrowRight,
   Sparkles,
+  Bell,
+  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -69,6 +71,7 @@ export default function DashboardPage() {
       bg: 'bg-blue-50',
       change: '+12%',
       positive: true,
+      href: '/candidatures',
     },
     {
       label: 'Taux de réponse',
@@ -78,6 +81,7 @@ export default function DashboardPage() {
       bg: 'bg-emerald-50',
       change: '+8%',
       positive: true,
+      href: '/candidatures',
     },
     {
       label: 'Entretiens obtenus',
@@ -87,6 +91,7 @@ export default function DashboardPage() {
       bg: 'bg-violet-50',
       change: '+3',
       positive: true,
+      href: '/candidatures?status=INTERVIEW_SCHEDULED',
     },
     {
       label: 'En attente',
@@ -96,6 +101,7 @@ export default function DashboardPage() {
       bg: 'bg-amber-50',
       change: '7 jours',
       positive: null,
+      href: '/candidatures',
     },
   ];
 
@@ -113,9 +119,10 @@ export default function DashboardPage() {
           : statCards.map((s) => {
               const Icon = s.icon;
               return (
-                <div
+                <Link
                   key={s.label}
-                  className="bg-white rounded-card border border-[#E2E8F0] p-5"
+                  href={s.href}
+                  className="bg-white rounded-card border border-[#E2E8F0] p-5 hover:border-accent/40 hover:shadow-md transition-all"
                   style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}
                 >
                   <div className="flex items-start justify-between mb-3">
@@ -130,10 +137,57 @@ export default function DashboardPage() {
                   </div>
                   <p className="text-2xl font-extrabold font-heading text-[#1E293B] mb-0.5">{s.value}</p>
                   <p className="text-xs text-[#64748B]">{s.label}</p>
-                </div>
+                </Link>
               );
             })}
       </motion.div>
+
+      {/* ── Job Alert Banner ──────────────────────────────────────── */}
+      {recommended.length > 0 && (
+        <motion.div variants={fadeInUp} className="bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/30 rounded-card px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center shrink-0">
+              <Bell size={16} className="text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-[#1E293B]">
+                {recommended.length} nouvelle{recommended.length > 1 ? 's' : ''} offre{recommended.length > 1 ? 's' : ''} correspondent à votre profil aujourd&apos;hui
+              </p>
+              <p className="text-xs text-[#64748B]">Basé sur vos compétences et préférences enregistrées</p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Link href="/offres?tab=recommended" className="flex items-center gap-1.5 px-4 py-2 rounded-btn border border-accent text-accent text-sm font-semibold hover:bg-accent hover:text-white transition-all">
+              Voir les offres <ArrowRight size={13} />
+            </Link>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Auto-Apply Suggestion Banner ─────────────────────────── */}
+      {recommended.length >= 5 && (
+        <motion.div variants={fadeInUp} className="bg-gradient-to-r from-violet-50 to-accent/5 border border-violet-200 rounded-card px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-9 h-9 bg-violet-500 rounded-xl flex items-center justify-center shrink-0">
+              <Zap size={16} className="text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-[#1E293B]">
+                {recommended.length} nouvelles offres correspondent à votre profil.
+                <br />
+                <span className="font-normal text-[#475569]">Voulez-vous candidater automatiquement ?</span>
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/offres?tab=recommended&autoApply=1"
+            className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-btn text-sm font-semibold hover:bg-violet-700 transition-colors whitespace-nowrap"
+          >
+            <Zap size={13} />
+            Lancer les candidatures auto
+          </Link>
+        </motion.div>
+      )}
 
       {/* Chart + quick actions */}
       <motion.div variants={fadeInUp} className="grid lg:grid-cols-7 gap-4">

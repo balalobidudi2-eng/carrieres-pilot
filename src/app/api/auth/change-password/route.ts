@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword, hashPassword, requireAuth } from '@/lib/auth';
-import { DEMO_USER_ID } from '@/lib/demo-user';
-
-const DEMO_IDS = new Set([DEMO_USER_ID, 'test-free', 'test-pro', 'test-expert']);
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -12,11 +9,6 @@ export async function POST(req: NextRequest) {
   const { currentPassword, newPassword } = await req.json();
   if (!currentPassword || !newPassword || newPassword.length < 8) {
     return NextResponse.json({ error: 'Données invalides' }, { status: 400 });
-  }
-
-  // Demo / test accounts — skip DB, always succeed
-  if (DEMO_IDS.has(userId)) {
-    return NextResponse.json({ ok: true });
   }
 
   let user;

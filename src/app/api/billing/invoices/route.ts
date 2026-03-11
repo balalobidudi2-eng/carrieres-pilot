@@ -2,16 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getStripe } from '@/lib/stripe-service';
-import { DEMO_USER_ID } from '@/lib/demo-user';
 
 /** GET /api/billing/invoices — list Stripe invoices for the user */
 export async function GET(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
-
-  if (userId === DEMO_USER_ID) {
-    return NextResponse.json({ invoices: [], isDemo: true });
-  }
 
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ invoices: [], stripeNotConfigured: true });
