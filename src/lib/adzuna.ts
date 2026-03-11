@@ -100,6 +100,6 @@ function normalizeAdzunaOffer(a: AdzunaResult) {
     remote: (a.location?.display_name ?? '').toLowerCase().includes('télétravail') ||
             (a.title ?? '').toLowerCase().includes('remote') ||
             (a.title ?? '').toLowerCase().includes('télétravail'),
-    matchScore: undefined as number | undefined,
+    matchScore: undefined as number | undefined as undefined,
   };
 }

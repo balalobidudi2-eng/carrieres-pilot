@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
   const hasFT = !!process.env.FRANCE_TRAVAIL_CLIENT_ID;
   const hasAdzuna = !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY);
 
-  let offers: ReturnType<typeof normalizeOffer>[] = [];
+  type NormalizedOffer = Omit<ReturnType<typeof normalizeOffer>, 'matchScore'> & { matchScore?: number };
+  let offers: NormalizedOffer[] = [];
 
   // Try France Travail first (unless user explicitly requests Adzuna)
   if (source !== 'adzuna' && hasFT) {
