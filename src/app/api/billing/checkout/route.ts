@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!process.env.STRIPE_SECRET_KEY?.trim()) {
     return NextResponse.json({ error: 'Stripe non configuré' }, { status: 503 });
   }
 
@@ -17,6 +17,12 @@ export async function POST(req: NextRequest) {
   }
 
   const origin = req.headers.get('origin') ?? req.nextUrl.origin;
-  const url = await createCheckoutSession(userId, plan, origin);
-  return NextResponse.json({ url });
+  try {
+    const url = await createCheckoutSession(userId, plan, origin);
+    return NextResponse.json({ url });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    console.error('[billing/checkout]', message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

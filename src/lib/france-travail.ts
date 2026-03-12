@@ -25,8 +25,8 @@ async function fetchFT(url: string, options: RequestInit = {}, timeoutMs = 12_00
 async function getAccessToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) return cachedToken.token;
 
-  const clientId = process.env.FRANCE_TRAVAIL_CLIENT_ID!;
-  const clientSecret = process.env.FRANCE_TRAVAIL_CLIENT_SECRET!;
+  const clientId = process.env.FRANCE_TRAVAIL_CLIENT_ID!.trim();
+  const clientSecret = process.env.FRANCE_TRAVAIL_CLIENT_SECRET!.trim();
 
   const res = await fetchFT(FT_AUTH_URL, {
     method: 'POST',

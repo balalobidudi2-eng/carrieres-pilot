@@ -82,6 +82,7 @@ export default function AdminUsersPage() {
 
       {/* Table */}
       <div className="bg-white dark:bg-[#112240] rounded-xl border border-[#E2E8F0] dark:border-white/10 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#E2E8F0] dark:border-white/10 bg-[#F8FAFC] dark:bg-white/5">
@@ -189,6 +190,7 @@ export default function AdminUsersPage() {
                 ))}
           </tbody>
         </table>
+        </div>
 
         {/* Pagination */}
         {totalPages > 1 && (

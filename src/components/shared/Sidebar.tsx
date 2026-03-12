@@ -19,6 +19,7 @@ import {
   ChevronRight,
   LogOut,
   Shield,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
@@ -31,6 +32,7 @@ const navGroups = [
     label: 'Principal',
     items: [
       { href: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
+      { href: '/notifications', icon: Bell, label: 'Notifications' },
     ],
   },
   {

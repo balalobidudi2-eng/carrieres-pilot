@@ -2,25 +2,29 @@ import Stripe from 'stripe';
 import { prisma } from './prisma';
 
 let _stripe: Stripe | null = null;
+let _stripeKey: string | undefined;
 
 export function getStripe(): Stripe {
-  if (!_stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY is not configured');
-    }
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2024-04-10' as Stripe.LatestApiVersion,
-    });
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured');
+  if (!_stripe || _stripeKey !== key) {
+    _stripe = new Stripe(key, { apiVersion: '2024-04-10' as Stripe.LatestApiVersion });
+    _stripeKey = key;
   }
   return _stripe;
 }
 
-const PRICES = {
-  PRO: process.env.STRIPE_PRO_PRICE_ID!,
-  EXPERT: process.env.STRIPE_EXPERT_PRICE_ID!,
-};
+function getPriceId(plan: 'PRO' | 'EXPERT'): string {
+  const raw = plan === 'PRO'
+    ? process.env.STRIPE_PRO_PRICE_ID
+    : process.env.STRIPE_EXPERT_PRICE_ID;
+  const id = raw?.trim();
+  if (!id) throw new Error(`Prix Stripe manquant pour le plan ${plan}. Configurez STRIPE_${plan}_PRICE_ID.`);
+  return id;
+}
 
 export async function createCheckoutSession(userId: string, plan: 'PRO' | 'EXPERT', origin: string) {
+  const priceId = getPriceId(plan);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
   let customerId = user.stripeCustomerId;
@@ -37,7 +41,7 @@ export async function createCheckoutSession(userId: string, plan: 'PRO' | 'EXPER
   const session = await getStripe().checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
-    line_items: [{ price: PRICES[plan], quantity: 1 }],
+    line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${origin}/abonnement?success=1`,
     cancel_url: `${origin}/abonnement?cancelled=1`,
     metadata: { userId, plan },

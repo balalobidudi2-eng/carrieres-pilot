@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 /** GET /api/auth/verify-email?token=xxx — confirms a user's email address */
 export async function GET(req: NextRequest) {
   const token = new URL(req.url).searchParams.get('token');
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`;
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`).trim();
 
   if (!token) {
     return NextResponse.redirect(`${baseUrl}/connexion?error=token_manquant`);
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       data: { emailVerificationToken, emailVerificationExpiry },
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`;
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`).trim();
     const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${emailVerificationToken}`;
     const emailResult = await sendVerificationEmail(user.email, user.firstName, verifyUrl);
 

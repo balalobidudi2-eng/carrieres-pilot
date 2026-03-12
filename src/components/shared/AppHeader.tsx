@@ -18,6 +18,9 @@ const routeLabels: Record<string, string> = {
   '/profil': 'Mon profil',
   '/abonnement': 'Abonnement',
   '/parametres': 'Paramètres',
+  '/notifications': 'Notifications',
+  '/favoris': 'Offres sauvegardées',
+  '/facturation': 'Facturation',
 };
 
 export function AppHeader() {

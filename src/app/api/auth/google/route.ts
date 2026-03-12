@@ -7,14 +7,14 @@ import crypto from 'crypto';
  * Requires env vars: GOOGLE_CLIENT_ID, NEXT_PUBLIC_APP_URL
  */
 export async function GET(req: NextRequest) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
 
   if (!clientId) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`;
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`).trim();
     return NextResponse.redirect(`${baseUrl}/connexion?error=google_not_configured`);
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`;
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`).trim();
   const redirectUri = `${baseUrl}/api/auth/google/callback`;
 
   // CSRF protection — opaque random state stored in a short-lived cookie

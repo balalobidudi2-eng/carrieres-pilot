@@ -5,7 +5,11 @@
  * 1. Scrape the job offer URL for a contact email address (direct HTML scraping).
  * 2. If not found → ask OpenAI to deduce a likely contact email from company name + offer data.
  * 3. If email found (by either method) → send personalised email with CV + cover letter attachments.
- * 4. Playwright form automation is available but currently in standby.
+ * 4. If no email found → Playwright navigates to the offer URL, fills the form and submits it.
+ *
+ * Playwright runtime:
+ * - Production (Vercel serverless): playwright-core + @sparticuz/chromium-min
+ * - Development: playwright-core with local chromium (falls back to system chromium)
  */
 
 import OpenAI from 'openai';
@@ -175,70 +179,218 @@ Cordialement,
 ${signature}`;
 }
 
-// ─── Playwright fallback ─────────────────────────────────────────────────────
+// ─── Playwright form automation ──────────────────────────────────────────────
+
+/**
+ * Resolves a Chromium executable path that works both locally and on Vercel serverless.
+ * In production, uses @sparticuz/chromium-min which bundles a stripped Chromium binary
+ * compatible with AWS Lambda / Vercel runtimes.
+ */
+async function getChromiumPath(): Promise<{ executablePath: string; args: string[] }> {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    // Serverless: use the stripped chromium binary from @sparticuz/chromium-min
+    const chromiumMod = await import('@sparticuz/chromium-min');
+    const chromium = chromiumMod.default;
+    // Download the binary from the CDN the first time, then cache in /tmp
+    const executablePath = await chromium.executablePath(
+      `https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar`,
+    );
+    return { executablePath, args: chromium.args };
+  }
+  // Local development: let playwright-core find chromium on its own
+  return { executablePath: '', args: [] };
+}
 
 async function tryPlaywrightFill(req: FormFillRequest): Promise<FormFillResult> {
-  let chromium: import('playwright').BrowserType;
+  let pw: typeof import('playwright-core');
   try {
-    // Dynamic import so the module compiles even when playwright is absent
-    const pw = await import('playwright');
-    chromium = pw.chromium;
+    pw = await import('playwright-core');
   } catch {
     return {
       success: false,
       status: 'unsupported',
-      message:
-        'Aucun email trouvé sur cette offre. ' +
-        'Pour l\'automatisation de formulaires, installez Playwright : ' +
-        '`npm install playwright` puis `npx playwright install chromium`.',
+      message: 'Playwright non disponible sur ce serveur.',
     };
   }
 
-  let browser: import('playwright').Browser | undefined;
+  let browser: import('playwright-core').Browser | undefined;
   try {
-    browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
-    await page.goto(req.applicationUrl, { timeout: 20000, waitUntil: 'domcontentloaded' });
+    const { executablePath, args } = await getChromiumPath();
+
+    const launchOptions: Parameters<typeof pw.chromium.launch>[0] = {
+      headless: true,
+      args: args.length > 0 ? args : [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    };
+    if (executablePath) launchOptions.executablePath = executablePath;
+
+    browser = await pw.chromium.launch(launchOptions);
+    const context = await browser.newContext({
+      // Behave like a real browser to reduce bot detection
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1280, height: 800 },
+      locale: 'fr-FR',
+    });
+    const page = await context.newPage();
+
+    await page.goto(req.applicationUrl, { timeout: 25_000, waitUntil: 'domcontentloaded' });
+
+    // Small wait for React/JS-rendered forms to mount
+    await page.waitForTimeout(1500);
 
     let filled = 0;
 
-    // Generic field selectors — covers most ATS (Lever, Greenhouse, Workday, etc.)
-    const fieldMap: Array<[string, string]> = [
-      ['input[name*="first" i], input[placeholder*="prénom" i]', req.firstName],
-      ['input[name*="last" i], input[placeholder*="nom" i]', req.lastName],
-      ['input[type="email"], input[name*="email" i]', req.email],
-      ['input[type="tel"], input[name*="phone" i], input[name*="telephone" i]', req.phone ?? ''],
-      ['input[name*="linkedin" i], input[placeholder*="linkedin" i]', req.linkedinUrl ?? ''],
+    // ── Standard form fields (ATS: Lever, Greenhouse, Workday, Taleo, SmartRecruiters…) ──
+    const fieldMap: Array<{ selectors: string[]; value: string }> = [
+      {
+        selectors: [
+          'input[name*="first" i]', 'input[id*="first" i]',
+          'input[placeholder*="prénom" i]', 'input[placeholder*="prenom" i]',
+          'input[placeholder*="first name" i]',
+          'input[aria-label*="prénom" i]',
+        ],
+        value: req.firstName,
+      },
+      {
+        selectors: [
+          'input[name*="last" i]', 'input[id*="last" i]',
+          'input[placeholder*="nom" i]', 'input[placeholder*="last name" i]',
+          'input[aria-label*="nom" i]',
+        ],
+        value: req.lastName,
+      },
+      {
+        selectors: [
+          'input[type="email"]', 'input[name*="email" i]',
+          'input[id*="email" i]', 'input[placeholder*="email" i]',
+        ],
+        value: req.email,
+      },
+      {
+        selectors: [
+          'input[type="tel"]', 'input[name*="phone" i]',
+          'input[name*="telephone" i]', 'input[name*="mobile" i]',
+          'input[id*="phone" i]', 'input[placeholder*="téléphone" i]',
+        ],
+        value: req.phone ?? '',
+      },
+      {
+        selectors: [
+          'input[name*="linkedin" i]', 'input[id*="linkedin" i]',
+          'input[placeholder*="linkedin" i]',
+        ],
+        value: req.linkedinUrl ?? '',
+      },
     ];
 
-    for (const [selector, value] of fieldMap) {
+    for (const { selectors, value } of fieldMap) {
       if (!value) continue;
-      try {
-        const el = page.locator(selector).first();
-        if (await el.isVisible({ timeout: 1000 })) {
-          await el.fill(value);
-          filled++;
-        }
-      } catch { /* field not present on this page */ }
+      for (const sel of selectors) {
+        try {
+          const el = page.locator(sel).first();
+          if (await el.isVisible({ timeout: 600 })) {
+            await el.fill(value);
+            filled++;
+            break; // only fill the first matching field per category
+          }
+        } catch { /* selector absent */ }
+      }
     }
 
-    // Attach CV if the page has a file input
+    // ── Cover letter textarea ──
+    if (req.coverLetterText) {
+      const textareaSelectors = [
+        'textarea[name*="cover" i]', 'textarea[id*="cover" i]',
+        'textarea[name*="letter" i]', 'textarea[name*="lettre" i]',
+        'textarea[placeholder*="lettre" i]', 'textarea[placeholder*="motivation" i]',
+        'textarea',
+      ];
+      for (const sel of textareaSelectors) {
+        try {
+          const el = page.locator(sel).first();
+          if (await el.isVisible({ timeout: 600 })) {
+            await el.fill(req.coverLetterText);
+            filled++;
+            break;
+          }
+        } catch { /* absent */ }
+      }
+    }
+
+    // ── CV file upload ──
     if (req.cvPdfUrl) {
       try {
         const fileInput = page.locator('input[type="file"]').first();
         if (await fileInput.isVisible({ timeout: 1000 })) {
-          await fileInput.setInputFiles(req.cvPdfUrl);
-          filled++;
+          // Download the CV PDF to a temp buffer then attach it
+          const cvRes = await fetch(req.cvPdfUrl);
+          if (cvRes.ok) {
+            const cvBuffer = Buffer.from(await cvRes.arrayBuffer());
+            await fileInput.setInputFiles({
+              name: `CV_${req.firstName}_${req.lastName}.pdf`,
+              mimeType: 'application/pdf',
+              buffer: cvBuffer,
+            });
+            filled++;
+          }
         }
-      } catch { /* no file input */ }
+      } catch { /* no file input or download failed */ }
+    }
+
+    if (filled === 0) {
+      return {
+        success: false,
+        status: 'failed',
+        message: `Aucun champ de formulaire détecté sur cette page. Postulez directement : ${req.applicationUrl}`,
+      };
+    }
+
+    // ── Submit the form ──
+    const submitSelectors = [
+      'button[type="submit"]',
+      'input[type="submit"]',
+      'button[aria-label*="submit" i]',
+      'button[aria-label*="envoyer" i]',
+      'button[aria-label*="postuler" i]',
+      'button:has-text("Soumettre")',
+      'button:has-text("Envoyer")',
+      'button:has-text("Postuler")',
+      'button:has-text("Candidater")',
+      'button:has-text("Submit")',
+      'button:has-text("Apply")',
+    ];
+
+    let submitted = false;
+    for (const sel of submitSelectors) {
+      try {
+        const btn = page.locator(sel).first();
+        if (await btn.isVisible({ timeout: 800 })) {
+          await btn.click();
+          // Wait for navigation or confirmation message
+          await Promise.race([
+            page.waitForNavigation({ timeout: 8000 }),
+            page.waitForSelector(
+              '[class*="success" i], [class*="confirm" i], [class*="merci" i], [aria-live="polite"]',
+              { timeout: 8000 },
+            ),
+          ]).catch(() => { /* timeout OK, page may not navigate */ });
+          submitted = true;
+          break;
+        }
+      } catch { /* absent */ }
     }
 
     return {
-      success: filled > 0,
-      status: filled > 0 ? 'partial' : 'failed',
-      message: filled > 0
-        ? `Formulaire pré-rempli (${filled} champ(s)). Vérifiez et soumettez manuellement.`
-        : 'Impossible de remplir le formulaire automatiquement sur cette page.',
+      success: submitted,
+      status: submitted ? 'submitted' : 'partial',
+      message: submitted
+        ? `Candidature soumise automatiquement (${filled} champ(s) rempli(s)).`
+        : `Formulaire pré-rempli (${filled} champ(s)) mais la soumission automatique n'a pas abouti. Vérifiez et validez manuellement.`,
       fieldsFilledCount: filled,
     };
   } catch (err: unknown) {
@@ -249,18 +401,28 @@ async function tryPlaywrightFill(req: FormFillRequest): Promise<FormFillResult> 
   }
 }
 
-// ─── Main entry point ────────────────────────────────────────────────────────
-
 /**
  * Auto-apply to a job offer.
- * Scrapes the page for a contact email → sends a personalised email with attachments.
- * Playwright form automation is available but disabled for now (standby).
+ *
+ * @param mode - 'smtp' : email uniquement | 'playwright' : formulaire uniquement | 'both' : email d'abord, Playwright en fallback
+ *
+ * Priority order (mode = 'both'):
+ * 1. Find a recruiter email on the page (HTML scraping) → send personalised email.
+ * 2. Ask OpenAI to deduce the email → send personalised email.
+ * 3. Use Playwright to navigate, fill the form and submit it directly.
  */
-export async function autoFillApplicationForm(request: FormFillRequest): Promise<FormFillResult> {
-  // Step 1: scrape the page for a direct email
-  const { email: scrapedEmail, pageText } = await findCompanyEmail(request.applicationUrl);
+export async function autoFillApplicationForm(
+  request: FormFillRequest,
+  mode: 'smtp' | 'playwright' | 'both' = 'both',
+): Promise<FormFillResult> {
 
-  // Step 2: if not found, ask AI to deduce one
+  // ── Mode Playwright uniquement ─────────────────────────────────────────────
+  if (mode === 'playwright') {
+    return tryPlaywrightFill(request);
+  }
+
+  // ── Mode SMTP (+ mode Both) : email d'abord ────────────────────────────────
+  const { email: scrapedEmail, pageText } = await findCompanyEmail(request.applicationUrl);
   const companyEmail = scrapedEmail ?? await findEmailWithAI(request, pageText ?? undefined);
 
   if (companyEmail) {
@@ -287,18 +449,23 @@ export async function autoFillApplicationForm(request: FormFillRequest): Promise
         fieldsFilledCount: 3,
       };
     }
-
+    // Email failed — si mode 'smtp' on s'arrête là, sinon fallback Playwright
+    if (mode === 'smtp') {
+      return {
+        success: false,
+        status: 'failed',
+        message: `Échec de l'envoi email à ${companyEmail} (${result.error}). Vérifiez votre connexion SMTP.`,
+      };
+    }
+  } else if (mode === 'smtp') {
+    // Mode SMTP mais aucun email trouvé — pas de Playwright
     return {
       success: false,
-      status: 'failed',
-      message: `Échec de l'envoi email (${result.error}). Vérifiez votre connexion et réessayez.`,
+      status: 'unsupported',
+      message: `Aucune adresse email trouvée pour cette offre. Postulez directement : ${request.applicationUrl}`,
     };
   }
 
-  // No email found by scraping nor by AI — Playwright automation is in standby
-  return {
-    success: false,
-    status: 'unsupported',
-    message: `Aucune adresse email trouvée pour cette offre (scraping + IA). Postulez directement via le lien : ${request.applicationUrl}`,
-  };
+  // ── Fallback Playwright (mode 'both' quand email absent ou échoué) ─────────
+  return tryPlaywrightFill(request);
 }

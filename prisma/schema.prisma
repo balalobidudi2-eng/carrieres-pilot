@@ -79,6 +79,8 @@ model User {
   deletionScheduledAt DateTime?
   deletionReason      String?
 
+  supabaseId  String?  @unique
+
   adminLevel  Int?
   lastLoginAt DateTime?
 
@@ -91,14 +93,15 @@ model User {
   smtpPassEnc String?
   smtpFrom    String?
 
-  cvs           CV[]
-  letters       CoverLetter[]
-  applications  Application[]
-  refreshTokens RefreshToken[]
-  dailyUsages   DailyUsage[]
-  jobAlerts     JobAlert[]
+  cvs              CV[]
+  letters          CoverLetter[]
+  applications     Application[]
+  refreshTokens    RefreshToken[]
+  dailyUsages      DailyUsage[]
+  jobAlerts        JobAlert[]
   savedOffers      SavedOffer[]
   contactMessages  ContactMessage[]
+  jobNotifications JobNotification[]
 
   @@map("users")
 }
@@ -257,4 +260,24 @@ model ContactMessage {
 
   @@index([userId])
   @@map("contact_messages")
+}
+
+// ─── Job Notification ──────────────────────────────────────────────────────────
+
+model JobNotification {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offerId    String
+  title      String
+  company    String
+  location   String   @default("")
+  url        String?
+  matchScore Int?
+  read       Boolean  @default(false)
+  detectedAt DateTime @default(now())
+
+  @@unique([userId, offerId])
+  @@index([userId])
+  @@map("job_notifications")
 }

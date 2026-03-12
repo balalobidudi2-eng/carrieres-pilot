@@ -2,10 +2,11 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Bookmark, Building2, MapPin, Clock, ExternalLink, Trash2, Search } from 'lucide-react';
+import { Bookmark, Building2, MapPin, Clock, ExternalLink, Trash2, Search, Bot } from 'lucide-react';
 import { api } from '@/lib/axios';
 import { staggerContainer, fadeInUp } from '@/lib/animations';
 import { Badge } from '@/components/ui/Badge';
+import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
 
 interface SavedOffer {
@@ -22,6 +23,7 @@ interface SavedOffer {
 
 export default function FavorisPage() {
   const qc = useQueryClient();
+  const { user } = useAuthStore();
 
   const { data: offers = [], isLoading } = useQuery<SavedOffer[]>({
     queryKey: ['savedOffers', 'full'],
@@ -38,10 +40,36 @@ export default function FavorisPage() {
     onError: () => toast.error('Erreur lors de la suppression'),
   });
 
+  // P8 — auto-apply mutation for saved offers
+  const autoApplyMutation = useMutation({
+    mutationFn: (offer: SavedOffer) =>
+      api.post('/applications/auto-fill', {
+        applicationUrl: offer.url,
+        firstName: user?.firstName ?? '',
+        lastName: user?.lastName ?? '',
+        email: user?.email ?? '',
+        offerTitle: offer.title,
+        offerCompany: offer.company,
+      }).then((r) => r.data as { success: boolean; message: string }),
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success('Candidature envoyée automatiquement !');
+        qc.invalidateQueries({ queryKey: ['user-usage'] });
+        qc.invalidateQueries({ queryKey: ['application-stats'] });
+      } else {
+        toast(data.message, { icon: '⚠️' });
+      }
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Erreur lors de la candidature automatique';
+      toast.error(msg);
+    },
+  });
+
   return (
     <motion.div initial="initial" animate="animate" variants={staggerContainer} className="space-y-6 max-w-[860px]">
       {/* Header */}
-      <motion.div variants={fadeInUp} className="flex items-start justify-between gap-4">
+      <motion.div variants={fadeInUp} className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-heading text-2xl font-bold text-[#1E293B]">Mes favoris</h2>
           <p className="text-sm text-[#64748B] mt-0.5">
@@ -126,7 +154,7 @@ export default function FavorisPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               {offer.url && (
                 <a
                   href={offer.url}
@@ -137,6 +165,17 @@ export default function FavorisPage() {
                   <ExternalLink size={12} />
                   Voir l&apos;offre
                 </a>
+              )}
+              {/* P8 — Candidature auto */}
+              {offer.url && (
+                <button
+                  onClick={() => autoApplyMutation.mutate(offer)}
+                  disabled={autoApplyMutation.isPending}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-violet-50 text-violet-600 text-xs font-semibold hover:bg-violet-100 transition-colors disabled:opacity-50"
+                >
+                  <Bot size={12} />
+                  Candidature auto 🤖
+                </button>
               )}
               <button
                 onClick={() => removeMutation.mutate(offer.offerId)}

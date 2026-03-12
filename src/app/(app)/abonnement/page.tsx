@@ -152,9 +152,9 @@ export default function AbonnementPage() {
 
       {/* Current plan banner */}
       {billingStatus?.nextRenewal && (
-        <motion.div variants={fadeInUp} className="bg-accent/5 border border-accent/20 rounded-card p-4 flex items-center gap-3">
+        <motion.div variants={fadeInUp} className="bg-accent/5 border border-accent/20 rounded-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <Shield size={18} className="text-accent shrink-0" />
-          <div>
+          <div className="flex-1">
             <p className="font-semibold text-sm text-[#1E293B]">Plan {currentPlan} actif</p>
             <p className="text-xs text-[#64748B]">
               Prochain renouvellement : {new Date(billingStatus.nextRenewal).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -163,7 +163,7 @@ export default function AbonnementPage() {
           <Button
             variant="outline"
             size="sm"
-            className="ml-auto"
+            className="self-start sm:self-auto"
             onClick={() => router.push('/facturation')}
           >
             <CreditCard size={14} />
@@ -173,7 +173,7 @@ export default function AbonnementPage() {
       )}
 
       {/* Plans grid */}
-      <motion.div variants={fadeInUp} className="grid grid-cols-3 gap-5">
+      <motion.div variants={fadeInUp} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {PLANS.map((plan) => {
           const Icon = plan.icon;
           const isCurrent = currentPlan === plan.id;
@@ -259,12 +259,12 @@ export default function AbonnementPage() {
 
       {/* Billing portal */}
       {currentPlan !== 'FREE' && (
-        <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-5 flex items-center justify-between" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+        <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
           <div>
             <p className="font-semibold text-sm text-[#1E293B]">Gérer votre abonnement</p>
             <p className="text-xs text-[#64748B] mt-0.5">Modifier votre moyen de paiement, télécharger vos factures, annuler</p>
           </div>
-          <Button variant="outline" onClick={() => router.push('/facturation')}>
+          <Button variant="outline" onClick={() => router.push('/facturation')} className="self-start sm:self-auto">
             <ExternalLink size={14} />
             Facturation & factures
           </Button>

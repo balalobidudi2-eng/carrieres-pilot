@@ -264,7 +264,7 @@ export default function ProfilPage() {
       {/* Header */}
       <motion.div variants={fadeInUp} className="flex items-start gap-4">
         {/* Avatar */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-2xl font-extrabold font-heading shrink-0 uppercase">
             {(user?.firstName ?? 'U').slice(0, 1)}
           </div>
@@ -272,9 +272,9 @@ export default function ProfilPage() {
             <Camera size={11} />
           </button>
         </div>
-        <div>
-          <h2 className="font-heading text-2xl font-bold text-[#1E293B]">{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Mon profil'}</h2>
-          <p className="text-sm text-[#64748B] mt-0.5">{user?.email}</p>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-heading text-xl sm:text-2xl font-bold text-[#1E293B] truncate">{[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Mon profil'}</h2>
+          <p className="text-sm text-[#64748B] mt-0.5 truncate">{user?.email}</p>
           {user?.plan && (
             <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
               user.plan === 'FREE' ? 'bg-gray-100 text-gray-600' : user.plan === 'PRO' ? 'bg-accent/10 text-accent' : 'bg-amber-50 text-amber-600'
@@ -293,21 +293,21 @@ export default function ProfilPage() {
             <span className="text-xs text-[#64748B] font-medium">{completionPct}% complet</span>
           </div>
         </div>
-        <div className="ml-auto">
+        <div className="shrink-0">
           <Button onClick={handleSubmit((d) => saveMutation.mutate(d))} loading={saveMutation.isPending}>
             <Save size={15} />
-            Enregistrer
+            <span className="hidden sm:inline">Enregistrer</span>
           </Button>
         </div>
       </motion.div>
 
       {/* Tabs */}
-      <motion.div variants={fadeInUp} className="flex gap-1 bg-[#F7F8FC] p-1 rounded-xl w-fit">
+      <motion.div variants={fadeInUp} className="grid grid-cols-2 sm:flex gap-1 bg-[#F7F8FC] p-1 rounded-xl">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               activeTab === t.id ? 'bg-white text-accent shadow-sm' : 'text-[#64748B] hover:text-[#1E293B]'
             }`}
           >
@@ -323,7 +323,7 @@ export default function ProfilPage() {
           <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-6 space-y-5" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
             <h3 className="font-heading font-semibold text-[#1E293B] text-base border-b border-[#E2E8F0] pb-3">Informations personnelles</h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="Prénom" {...register('firstName')} error={errors.firstName?.message} />
               <Input label="Nom" {...register('lastName')} error={errors.lastName?.message} />
               <Input label="Email" type="email" {...register('email')} error={errors.email?.message} />
@@ -600,7 +600,7 @@ export default function ProfilPage() {
                       <X size={15} />
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Input label="Entreprise" value={exp.company} onChange={(e) => setExperiences((prev) => prev.map((x, idx) => idx === i ? { ...x, company: e.target.value } : x))} placeholder="ex: Apple" />
                     <Input label="Poste" value={exp.title} onChange={(e) => setExperiences((prev) => prev.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} placeholder="ex: Software Engineer" />
                     <Input label="Date de début" value={exp.startDate} onChange={(e) => setExperiences((prev) => prev.map((x, idx) => idx === i ? { ...x, startDate: e.target.value } : x))} placeholder="ex: Jan 2022" />
@@ -635,10 +635,10 @@ export default function ProfilPage() {
                       <X size={15} />
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Input label="École / Université" value={form.school} onChange={(e) => setFormations((prev) => prev.map((x, idx) => idx === i ? { ...x, school: e.target.value } : x))} placeholder="ex: École Polytechnique" />
                     <Input label="Diplôme" value={form.degree} onChange={(e) => setFormations((prev) => prev.map((x, idx) => idx === i ? { ...x, degree: e.target.value } : x))} placeholder="ex: Master Informatique" />
-                    <Input label="Année" value={form.year} onChange={(e) => setFormations((prev) => prev.map((x, idx) => idx === i ? { ...x, year: e.target.value } : x))} placeholder="ex: 2021" className="col-span-2" />
+                    <Input label="Année" value={form.year} onChange={(e) => setFormations((prev) => prev.map((x, idx) => idx === i ? { ...x, year: e.target.value } : x))} placeholder="ex: 2021" className="col-span-1 sm:col-span-2" />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-[#1E293B] mb-1.5">Description</label>

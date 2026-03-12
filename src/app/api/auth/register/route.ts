@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
-import { sendVerificationEmail } from '@/lib/email-service';
-import crypto from 'crypto';
+import { supabaseAdmin, supabaseServer } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -12,51 +11,53 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email et mot de passe (8 car. min) requis' }, { status: 400 });
   }
 
-  const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  const normalizedEmail = (email as string).toLowerCase();
+
+  // Check if email already used (in Prisma)
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) {
     return NextResponse.json({ error: 'Email déjà utilisé' }, { status: 409 });
   }
 
-  const passwordHash = await hashPassword(password);
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`).trim();
 
-  // Generate email verification token (valid 24h)
-  const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-  const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-  const user = await prisma.user.create({
-    data: {
-      email: email.toLowerCase(),
-      passwordHash,
-      firstName: firstName ?? null,
-      lastName: lastName ?? null,
-      emailVerificationToken,
-      emailVerificationExpiry,
+  // Step 1: signUp via Supabase — this automatically sends the confirmation email
+  // The emailRedirectTo must also be listed in Supabase dashboard >
+  // Auth > URL Configuration > Redirect URLs
+  const { data: sbData, error: sbError } = await supabaseServer.auth.signUp({
+    email: normalizedEmail,
+    password,
+    options: {
+      emailRedirectTo: `${baseUrl}/api/auth/callback`,
+      data: { firstName: firstName ?? '', lastName: lastName ?? '' },
     },
   });
 
-  // Send verification email (awaited so we can return devPreviewUrl to the client)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`;
-  const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${emailVerificationToken}`;
-
-  let devPreviewUrl: string | undefined;
-  try {
-    const emailResult = await sendVerificationEmail(user.email, user.firstName, verifyUrl);
-    if (!emailResult.success) {
-      console.error('[register] ⚠️  Email non envoyé à', user.email, ':', emailResult.error);
-      console.log('[register] Lien de vérification (backup):', verifyUrl);
-    }
-    // In development only — surface the Ethereal preview URL or the direct verify link
-    if (process.env.NODE_ENV !== 'production') {
-      devPreviewUrl = emailResult.devPreviewUrl ?? verifyUrl;
-    }
-  } catch (err) {
-    console.error('[register] sendVerificationEmail exception:', err);
-    console.log('[register] Lien de vérification (backup):', verifyUrl);
-    if (process.env.NODE_ENV !== 'production') {
-      devPreviewUrl = verifyUrl;
-    }
+  if (sbError) {
+    console.error('[register] Supabase signUp error:', sbError.message);
+    return NextResponse.json({ error: sbError.message }, { status: 400 });
   }
 
+  if (!sbData.user) {
+    return NextResponse.json({ error: 'Erreur lors de la création du compte' }, { status: 500 });
+  }
+
+  const supabaseId = sbData.user.id;
+
+  // Step 2: create the Prisma user linked to the Supabase user
+  const passwordHash = await hashPassword(password);
+
+  await prisma.user.create({
+    data: {
+      email: normalizedEmail,
+      passwordHash,
+      supabaseId,
+      firstName: firstName ?? null,
+      lastName: lastName ?? null,
+      emailVerified: false,
+    },
+  });
+
   // Do NOT issue tokens — user must verify email first
-  return NextResponse.json({ emailPending: true, devPreviewUrl }, { status: 201 });
+  return NextResponse.json({ emailPending: true }, { status: 201 });
 }

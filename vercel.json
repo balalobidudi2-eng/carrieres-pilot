@@ -1,4 +1,9 @@
 {
   "regions": ["cdg1"],
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "functions": {
+    "src/app/api/applications/auto-fill/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }

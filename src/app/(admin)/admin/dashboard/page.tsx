@@ -76,7 +76,7 @@ export default function AdminDashboardPage() {
       {/* Plans */}
       <div>
         <h2 className="text-sm font-semibold text-[#64748B] uppercase tracking-wide mb-3">Répartition des plans</h2>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {planCards.map((c) => (
             <div key={c.label} className="bg-white dark:bg-[#112240] rounded-xl border border-[#E2E8F0] dark:border-white/10 p-5">
               <div className={`text-2xl font-bold mb-1 ${c.color}`}>{c.value}</div>
@@ -112,6 +112,7 @@ export default function AdminDashboardPage() {
           Dernières inscriptions
         </h2>
         <div className="bg-white dark:bg-[#112240] rounded-xl border border-[#E2E8F0] dark:border-white/10 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#E2E8F0] dark:border-white/10 bg-[#F8FAFC] dark:bg-white/5">
@@ -151,6 +152,7 @@ export default function AdminDashboardPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -161,6 +163,7 @@ export default function AdminDashboardPage() {
           Dernières candidatures
         </h2>
         <div className="bg-white dark:bg-[#112240] rounded-xl border border-[#E2E8F0] dark:border-white/10 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#E2E8F0] dark:border-white/10 bg-[#F8FAFC] dark:bg-white/5">
@@ -202,6 +205,7 @@ export default function AdminDashboardPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

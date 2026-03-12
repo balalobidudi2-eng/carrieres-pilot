@@ -53,19 +53,35 @@ function OffresPageContent() {
   const [customLocation, setCustomLocation] = useState('');
   const [tab, setTab] = useState<'recommended' | 'all'>(searchParams.get('q') ? 'all' : 'recommended');
   // committed = params actually used for last search
-  const [committed, setCommitted] = useState({ query: searchParams.get('q') ?? '', contracts: [] as string[], sectors: [] as string[], distance: 0, locationMode: 'france' as 'france' | 'custom', customLocation: '' });
+  const [committed, setCommitted] = useState({ query: searchParams.get('q') ?? '', contracts: [] as string[], sectors: [] as string[], distance: 0, locationMode: 'france' as 'france' | 'custom', customLocation: '', apiSource: 'both' as 'france_travail' | 'adzuna' | 'both' });
 
+  // Défaut 'both' : fallback Adzuna si France Travail est indisponible
+  const [apiSource, setApiSource] = useState<'france_travail' | 'adzuna' | 'both'>('both');
+  // Options de candidature automatique — exclusif admin ghilesaimeur951@gmail.com
+  const [smtpEnabled, setSmtpEnabled] = useState(true);
+  const [playwrightEnabled, setPlaywrightEnabled] = useState(true);
+  // hasSearched : aucun appel API tant que l'utilisateur n'a pas cliqué "Rechercher"
+  const [hasSearched, setHasSearched] = useState(() => !!searchParams.get('q'));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount = contracts.length + sectors.length + (distance > 0 ? 1 : 0) + (locationMode === 'custom' && customLocation ? 1 : 0);
 
   const triggerSearch = () => {
-    setCommitted({ query, contracts, sectors, distance, locationMode, customLocation });
+    setHasSearched(true);
+    setCommitted({ query, contracts, sectors, distance, locationMode, customLocation, apiSource });
+  };
+
+  // Quand l'admin change la source API, re-lancer la recherche immédiatement si déjà recherché
+  const handleSourceChange = (newSource: 'france_travail' | 'adzuna' | 'both') => {
+    setApiSource(newSource);
+    if (hasSearched) {
+      setCommitted((prev) => ({ ...prev, apiSource: newSource }));
+    }
   };
 
   // Sync URL param changes (e.g. navigating from GlobalSearchModal)
   useEffect(() => {
     const q = searchParams.get('q');
-    if (q) { setQuery(q); setTab('all'); setCommitted((prev) => ({ ...prev, query: q })); }
+    if (q) { setQuery(q); setTab('all'); setHasSearched(true); setCommitted((prev) => ({ ...prev, query: q })); }
   }, [searchParams]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -121,6 +137,12 @@ function OffresPageContent() {
     }
   };
 
+  // Réinitialiser tout le cache 'offers' au montage pour éviter les erreurs mises en cache
+  useEffect(() => {
+    qc.removeQueries({ queryKey: ['offers'] });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data: offers = [], isLoading, isError: offersIsError } = useQuery<JobOffer[]>({
     queryKey: ['offers', tab, committed],
     queryFn: () =>
@@ -133,17 +155,24 @@ function OffresPageContent() {
             distance: committed.distance > 0 ? committed.distance : undefined,
             commune: committed.locationMode === 'custom' && committed.customLocation ? committed.customLocation : undefined,
             max: 20,
+            // N'envoyer source QUE pour l'admin — les autres utilisateurs utilisent le comportement
+            // par défaut (France Travail + fallback Adzuna), ce qui évite les erreurs 502 si une API est down
+            source: tab === 'all' && user?.email === 'ghilesaimeur951@gmail.com' ? committed.apiSource : undefined,
           },
         })
         .then((r) => r.data),
+    enabled: hasSearched,
     placeholderData: keepPreviousData,
     staleTime: 3 * 60 * 1000,
+    gcTime: 0,       // ne jamais mettre en cache les erreurs — chaque activation repart de zéro
     retry: false,
   });
 
   useEffect(() => {
-    if (offersIsError) toast.error('Erreur lors de la recherche d\'offres. Réessayez dans un instant.');
-  }, [offersIsError]);
+    // N'afficher le toast que si l'utilisateur a effectivement lancé une recherche
+    // (évite le toast parasite dû aux erreurs mises en cache par React Query)
+    if (offersIsError && hasSearched) toast.error('Erreur lors de la recherche d\'offres. Réessayez dans un instant.');
+  }, [offersIsError, hasSearched]);
 
   // F6 — application stats for the mini stats bar
   const { data: appStats } = useQuery<{ totalApplications: number; responseRate: number; interviewsCount: number; pendingCount: number }>({
@@ -206,11 +235,19 @@ function OffresPageContent() {
         linkedinUrl: user?.linkedinUrl,
         offerTitle: offer.title,
         offerCompany: offer.company,
+        // Mode exclusif admin — détermine la stratégie de candidature
+        ...(user?.email === 'ghilesaimeur951@gmail.com' ? {
+          mode: smtpEnabled && playwrightEnabled ? 'both'
+              : smtpEnabled ? 'smtp'
+              : playwrightEnabled ? 'playwright'
+              : 'both', // fallback sécurisé si les deux sont désactivés
+        } : {}),
       }).then((r) => r.data as { success: boolean; status: string; message: string }),
     onSuccess: (data) => {
       if (data.success) {
         toast.success('Candidature envoyée automatiquement !');
         qc.invalidateQueries({ queryKey: ['application-stats'] });
+        qc.invalidateQueries({ queryKey: ['user-usage'] });
       } else {
         toast(data.message, { icon: '⚠️' });
       }
@@ -255,6 +292,39 @@ function OffresPageContent() {
       toast.error(msg);
     },
   });
+
+  const [bulkApplying, setBulkApplying] = useState(false);
+
+  const handleBulkAutoApply = async (offersList: JobOffer[]) => {
+    if (!offersList.length) return;
+    setBulkApplying(true);
+    let successCount = 0;
+    let failCount = 0;
+    for (const offer of offersList) {
+      try {
+        const result = await api.post('/applications/auto-fill', {
+          applicationUrl: offer.url,
+          offerTitle: offer.title,
+          offerCompany: offer.company,
+          ...(user?.email === 'ghilesaimeur951@gmail.com' ? {
+            mode: smtpEnabled && playwrightEnabled ? 'both'
+                : smtpEnabled ? 'smtp'
+                : playwrightEnabled ? 'playwright'
+                : 'both',
+          } : {}),
+        }).then((r) => r.data as { success: boolean; message: string });
+        if (result.success) successCount++;
+        else failCount++;
+      } catch {
+        failCount++;
+      }
+    }
+    setBulkApplying(false);
+    setSelectedIds(new Set());
+    qc.invalidateQueries({ queryKey: ['application-stats'] });
+    if (successCount > 0) toast.success(`${successCount} candidature(s) envoyée(s) automatiquement !`);
+    if (failCount > 0) toast.error(`${failCount} candidature(s) ont échoué.`);
+  };
 
   return (
     <motion.div
@@ -314,6 +384,80 @@ function OffresPageContent() {
               </div>
             </div>
           ) : null}
+        </motion.div>
+      )}
+
+      {/* Admin controls — visible uniquement pour ghilesaimeur951@gmail.com */}
+      {user?.email === 'ghilesaimeur951@gmail.com' && (
+        <motion.div variants={fadeInUp} className="bg-white border border-accent/20 rounded-card px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-3" style={{ boxShadow: '0 2px 12px rgba(15,52,96,0.05)' }}>
+          <span className="flex items-center gap-1.5 text-xs font-bold text-accent uppercase tracking-wide">
+            <Bot size={13} />
+            Admin
+          </span>
+
+          {/* ── Source API ─────────────────────────────────────── */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-[#64748B]">Source API</span>
+            <div className="flex gap-0.5 p-0.5 bg-[#F7F8FC] rounded-lg border border-[#E2E8F0]">
+              {([
+                { value: 'france_travail', label: 'France Travail' },
+                { value: 'adzuna', label: 'Adzuna' },
+                { value: 'both', label: 'Les deux' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleSourceChange(opt.value)}
+                  className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                    apiSource === opt.value ? 'bg-accent text-white shadow-sm' : 'text-[#64748B] hover:text-accent'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Candidature auto : SMTP ────────────────────────── */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <div
+              onClick={() => setSmtpEnabled((v) => !v)}
+              className={`w-8 h-4 rounded-full relative transition-colors ${
+                smtpEnabled ? 'bg-accent' : 'bg-[#CBD5E1]'
+              }`}
+            >
+              <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${
+                smtpEnabled ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </div>
+            <span className="text-xs font-semibold text-[#475569]">
+              📧 Activer SMTP
+            </span>
+          </label>
+
+          {/* ── Candidature auto : Playwright ──────────────────── */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <div
+              onClick={() => setPlaywrightEnabled((v) => !v)}
+              className={`w-8 h-4 rounded-full relative transition-colors ${
+                playwrightEnabled ? 'bg-purple-500' : 'bg-[#CBD5E1]'
+              }`}
+            >
+              <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${
+                playwrightEnabled ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </div>
+            <span className="text-xs font-semibold text-[#475569]">
+              🤖 Activer Playwright
+            </span>
+          </label>
+
+          {/* Indicateur mode actif */}
+          <span className="text-[10px] text-[#94A3B8]">
+            {smtpEnabled && playwrightEnabled && '⚡ SMTP + Playwright (fallback)'}
+            {smtpEnabled && !playwrightEnabled && '📧 Email uniquement'}
+            {!smtpEnabled && playwrightEnabled && '🤖 Playwright uniquement'}
+            {!smtpEnabled && !playwrightEnabled && <span className="text-red-400">⚠️ Aucun mode actif</span>}
+          </span>
         </motion.div>
       )}
 
@@ -562,7 +706,13 @@ function OffresPageContent() {
       )}
 
       {/* Offers grid */}
-      {isLoading ? (
+      {!hasSearched ? (
+        <motion.div variants={fadeInUp} className="bg-white rounded-card border border-[#E2E8F0] p-12 text-center" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
+          <Search size={40} className="mx-auto text-[#CBD5E1] mb-3" />
+          <p className="font-heading font-semibold text-[#1E293B]">Trouvez votre prochaine opportunité</p>
+          <p className="text-sm text-[#64748B] mt-1">Saisissez un mot-clé (titre, compétence, entreprise…) et cliquez sur <strong>Rechercher</strong>.</p>
+        </motion.div>
+      ) : isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-28 bg-gray-100 animate-pulse rounded-card" />
@@ -626,6 +776,17 @@ function OffresPageContent() {
                   </span>
                   <Badge variant="neutral">{offer.contractType}</Badge>
                   {offer.salary && <span className="font-semibold text-[#1E293B]">{offer.salary}</span>}
+                  {/* Source badge — visible pour l'admin et en mode 'both' */}
+                  {offer.source === 'adzuna' && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-orange-50 text-orange-600 text-[10px] font-semibold rounded border border-orange-200">
+                      Adzuna
+                    </span>
+                  )}
+                  {offer.source === 'france_travail' && committed.apiSource === 'both' && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-semibold rounded border border-blue-200">
+                      France Travail
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -651,17 +812,6 @@ function OffresPageContent() {
 
             {/* Actions */}
             <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {/* Postuler — ajoute l'offre au Kanban (TO_SEND) pour suivi manuel */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => applyMutation.mutate(offer)}
-                loading={applyMutation.isPending && (applyMutation.variables as any)?.id === offer.id}
-                title="Ajouter au Kanban pour un suivi manuel de votre candidature"
-              >
-                <Plus size={13} />
-                Postuler
-              </Button>
               {/* Candidature auto — PRO/EXPERT : IA remplit et envoie le dossier */}
               {(user?.plan === 'PRO' || user?.plan === 'EXPERT' || user?.adminLevel) ? (
                 <Button

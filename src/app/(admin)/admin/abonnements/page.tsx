@@ -41,7 +41,7 @@ export default function AdminAbonnementsPage() {
       </div>
 
       {/* Résumé */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Plan GRATUIT', value: dist.FREE, pct: Math.round((dist.FREE / total) * 100), color: 'text-slate-700', bar: 'bg-slate-400' },
           { label: 'Plan PRO', value: dist.PRO, pct: Math.round((dist.PRO / total) * 100), color: 'text-blue-700', bar: 'bg-blue-500' },

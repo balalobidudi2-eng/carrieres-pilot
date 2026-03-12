@@ -28,7 +28,18 @@ export async function requireAdmin(req: NextRequest, minLevel = 1): Promise<Admi
 
   const userId = payload.sub;
 
-  // Admin level embedded in JWT (set at login)
+  // Always do a fresh DB lookup for high-privilege operations (level 3+)
+  // to prevent stale JWT from granting revoked permissions.
+  if (minLevel >= 3) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { adminLevel: true },
+    });
+    if (!user?.adminLevel || user.adminLevel < minLevel) throw new Error('FORBIDDEN');
+    return { userId, adminLevel: user.adminLevel };
+  }
+
+  // Admin level embedded in JWT (trusted for lower-privilege operations)
   if (payload.adminLevel !== undefined && payload.adminLevel !== null) {
     if (payload.adminLevel < minLevel) throw new Error('FORBIDDEN');
     return { userId, adminLevel: payload.adminLevel };

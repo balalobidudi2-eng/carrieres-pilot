@@ -150,12 +150,12 @@ export default function LettresPage() {
   return (
     <motion.div initial="initial" animate="animate" variants={staggerContainer} className="space-y-6 max-w-[900px]">
       {/* Header */}
-      <motion.div variants={fadeInUp} className="flex items-center justify-between">
+      <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="font-heading text-2xl font-bold text-[#1E293B]">Lettres de motivation</h2>
           <p className="text-sm text-[#64748B] mt-0.5">Générées par IA, personnalisées pour chaque offre</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="secondary" onClick={() => setImportOpen(true)}>
             <Upload size={16} />
             Importer
@@ -201,7 +201,7 @@ export default function LettresPage() {
                 </div>
               </div>
               <p className={`text-sm text-[#64748B] mt-2 leading-relaxed whitespace-pre-line ${viewId === l.id ? 'max-h-[50vh] overflow-y-auto' : 'line-clamp-3'}`}>{l.content}</p>
-              <div className="flex gap-2 mt-3">
+              <div className="flex flex-wrap gap-2 mt-3">
                 <Button variant="outline" size="sm" onClick={() => setViewId(viewId === l.id ? null : l.id)}>
                   <ChevronDown size={12} className={`transition-transform ${viewId === l.id ? 'rotate-180' : ''}`} />{viewId === l.id ? 'Réduire' : 'Voir'}
                 </Button>
@@ -245,7 +245,7 @@ export default function LettresPage() {
           </div>
         )}
         <form onSubmit={onGenerate} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Poste visé" {...register('jobTitle')} error={errors.jobTitle?.message} placeholder="ex: Lead UX Designer" />
             <Input label="Entreprise (optionnel)" {...register('company')} error={errors.company?.message} placeholder="ex: Stripe" />
           </div>
@@ -379,7 +379,7 @@ export default function LettresPage() {
             )}
           </button>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Poste visé"
               placeholder="ex: Lead UX Designer"

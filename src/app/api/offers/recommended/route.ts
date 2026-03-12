@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { searchOffers, normalizeOffer } from '@/lib/france-travail';
+import { searchAdzunaOffers } from '@/lib/adzuna';
 import { checkQuota, incrementUsage, getUserPlan } from '@/lib/quota-service';
 
 /** GET /api/offers/recommended — offers matched to user profile */
@@ -35,26 +36,70 @@ export async function GET(req: NextRequest) {
   });
 
   // Build search query from explicit param or user profile
-  const keywords = searchQuery || [user?.currentTitle, ...(user?.skills?.slice(0, 3) ?? [])].filter(Boolean).join(' ');
+  // P4: use title + skills + sectors + location for better profile-based matching
+  const profileTerms = searchQuery ? [searchQuery] : [
+    user?.currentTitle,
+    ...(user?.skills?.slice(0, 3) ?? []),
+    ...(user?.targetSectors?.slice(0, 1) ?? []),
+  ].filter(Boolean);
+  const keywords = profileTerms.join(' ');
   const contractMap: Record<string, string> = { CDI: 'CDI', CDD: 'CDD', Stage: 'SAI', Alternance: 'MIS' };
   const typeContrat = user?.targetContract?.[0] ? contractMap[user.targetContract[0]] : undefined;
 
-  let result;
+  type NormalizedOffer = ReturnType<typeof normalizeOffer>;
+  let offers: NormalizedOffer[] = [];
+
+  // Essayer France Travail d'abord, Adzuna en fallback si FT échoue
   try {
-    result = await searchOffers({
+    const result = await searchOffers({
       motsCles: keywords || undefined,
       typeContrat,
       range: '0-19',
     });
-  } catch (err) {
-    console.error('[GET /api/offers/recommended] France Travail error:', err);
-    return NextResponse.json({ error: 'Erreur lors de la récupération des offres recommandées.' }, { status: 503 });
+    offers = result.resultats.map(normalizeOffer);
+  } catch (ftErr) {
+    console.warn('[GET /api/offers/recommended] France Travail failed, trying Adzuna fallback:', ftErr instanceof Error ? ftErr.message : ftErr);
+    const hasAdzuna = !!(process.env.ADZUNA_APP_ID?.trim() && process.env.ADZUNA_APP_KEY?.trim());
+    if (hasAdzuna) {
+      try {
+        const adzunaResults = await searchAdzunaOffers({ keywords: keywords || undefined });
+        offers = adzunaResults as NormalizedOffer[];
+      } catch (adzErr) {
+        console.error('[GET /api/offers/recommended] Adzuna also failed:', adzErr instanceof Error ? adzErr.message : adzErr);
+        return NextResponse.json([]);
+      }
+    } else {
+      return NextResponse.json([]);
+    }
   }
-
-  const offers = result.resultats.map(normalizeOffer);
 
   // Increment usage
   await incrementUsage(userId, 'job_search');
+
+  // Persist top offers as job notifications (upsert — preserves read status and detectedAt)
+  // P6: Cap new notifications at 20 per day to avoid overwhelming users
+  if (offers.length > 0) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayCount = await prisma.jobNotification.count({
+      where: { userId, detectedAt: { gte: todayStart } },
+    }).catch(() => 0);
+    const slotsLeft = Math.max(0, 20 - todayCount);
+    if (slotsLeft > 0) {
+      prisma.jobNotification.createMany({
+        data: offers.slice(0, slotsLeft).map((o) => ({
+          userId,
+          offerId: o.id,
+          title: o.title,
+          company: o.company,
+          location: o.location ?? '',
+          url: o.url ?? null,
+          matchScore: o.matchScore ?? null,
+        })),
+        skipDuplicates: true,
+      }).catch(() => {/* fire-and-forget */});
+    }
+  }
 
   return NextResponse.json(offers);
 }

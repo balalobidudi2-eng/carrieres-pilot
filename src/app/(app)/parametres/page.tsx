@@ -436,8 +436,8 @@ export default function ParametresPage() {
           </div>
           <h2 className="font-heading font-semibold text-[#1E293B]">Email &amp; SMTP</h2>
         </div>
-        <div className="p-6 flex items-center justify-between gap-4">
-          <div>
+        <div className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
             <p className="text-sm font-medium text-[#1E293B]">Configuration SMTP</p>
             <p className="text-xs text-[#94A3B8] mt-0.5">
               {smtpStatus?.configured
@@ -445,22 +445,22 @@ export default function ParametresPage() {
                 : 'Non configuré — les emails (alertes, candidatures) ne seront pas envoyés.'}
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3">
             {smtpStatus?.configured ? (
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 bg-green-50 border border-green-100 rounded-full px-2.5 py-1">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600 bg-green-50 border border-green-100 rounded-full px-2.5 py-1 shrink-0">
                 <CheckCircle size={13} />
                 Configuré
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1 shrink-0">
                 <XCircle size={13} />
                 Non configuré
               </span>
             )}
-            <Link href="/parametres/smtp">
+            <Link href="/parametres/smtp" className="shrink-0">
               <Button variant="outline" size="sm">
                 <ExternalLink size={13} />
-                Configurer
+                Configurer SMTP
               </Button>
             </Link>
           </div>

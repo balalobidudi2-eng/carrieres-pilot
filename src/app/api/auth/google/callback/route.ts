@@ -25,8 +25,8 @@ async function exchangeCodeForTokens(code: string, redirectUri: string): Promise
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: process.env.GOOGLE_CLIENT_ID!.trim(),
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!.trim(),
       redirect_uri: redirectUri,
       grant_type: 'authorization_code',
     }),
@@ -52,11 +52,11 @@ async function fetchGoogleUserInfo(accessToken: string): Promise<GoogleUserInfo>
  * user record, then issues JWT tokens and redirects to the dashboard.
  */
 export async function GET(req: NextRequest) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`;
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || `${req.headers.get('x-forwarded-proto') ?? 'http'}://${req.headers.get('host')}`).trim();
   const errorRedirect = (code: string) => NextResponse.redirect(`${baseUrl}/connexion?error=${code}`);
 
   // Verify env vars are present
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  if (!process.env.GOOGLE_CLIENT_ID?.trim() || !process.env.GOOGLE_CLIENT_SECRET?.trim()) {
     return errorRedirect('google_not_configured');
   }
 

@@ -38,9 +38,33 @@ export async function POST(req: NextRequest) {
   // Keep plan variable for non-admin quota increment below
   const plan = isAdmin ? 'FREE' : await getUserPlan(userId);
 
-  const body = await req.json() as Partial<FormFillRequest> & { offerTitle?: string; offerCompany?: string };
-  if (!body.applicationUrl || !body.firstName || !body.lastName || !body.email) {
-    return NextResponse.json({ error: 'Champs requis manquants (applicationUrl, firstName, lastName, email)' }, { status: 400 });
+  const body = await req.json() as Partial<FormFillRequest> & { offerTitle?: string; offerCompany?: string; mode?: 'smtp' | 'playwright' | 'both' };
+  const applyMode = body.mode ?? 'both';
+
+  if (!body.applicationUrl) {
+    return NextResponse.json({ error: 'applicationUrl est requis' }, { status: 400 });
+  }
+
+  // Use values from request body, fall back to the authenticated user's profile in DB
+  let firstName = body.firstName?.trim() || '';
+  let lastName = body.lastName?.trim() || '';
+  let email = body.email?.trim() || '';
+
+  if (!firstName || !lastName || !email) {
+    const userProfile = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, email: true },
+    });
+    firstName = firstName || userProfile?.firstName?.trim() || '';
+    lastName = lastName || userProfile?.lastName?.trim() || '';
+    email = email || userProfile?.email?.trim() || '';
+  }
+
+  if (!firstName || !lastName || !email) {
+    return NextResponse.json(
+      { error: 'Prénom, nom et email introuvables. Complétez votre profil avant de postuler.' },
+      { status: 400 },
+    );
   }
 
   // Fetch the user's most useful CV (default first, then most recently updated)
@@ -65,9 +89,9 @@ export async function POST(req: NextRequest) {
 
   const request: FormFillRequest = {
     applicationUrl: body.applicationUrl,
-    firstName: body.firstName,
-    lastName: body.lastName,
-    email: body.email,
+    firstName,
+    lastName,
+    email,
     phone: body.phone,
     linkedinUrl: body.linkedinUrl,
     cvPdfUrl: body.cvPdfUrl ?? cvPdfUrl,
@@ -78,7 +102,7 @@ export async function POST(req: NextRequest) {
     userId,
   };
 
-  const result = await autoFillApplicationForm(request);
+  const result = await autoFillApplicationForm(request, applyMode);
 
   // Only increment quota if actually submitted/sent (admins are exempt)
   if (result.success && !isAdmin) {
