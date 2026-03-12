@@ -73,8 +73,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Increment usage
-  await incrementUsage(userId, 'job_search');
+  // Non-fatal: quota tracking must never crash the route after results are fetched
+  await incrementUsage(userId, 'job_search').catch((err) =>
+    console.warn('[GET /api/offers/recommended] incrementUsage failed (non-fatal):', err instanceof Error ? err.message : err)
+  );
 
   // Persist top offers as job notifications (upsert — preserves read status and detectedAt)
   // P6: Cap new notifications at 20 per day to avoid overwhelming users

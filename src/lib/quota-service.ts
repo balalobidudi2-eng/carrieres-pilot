@@ -5,11 +5,13 @@ export type QuotaKey = keyof PlanLimits;
 
 function isDbError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
+  // Also check Prisma error code property (not always in the message string)
+  const code = (err as { code?: string }).code ?? '';
+  const SOFT_CODES = ['P1001', 'P1002', 'P1008', 'P2003', 'P2021'];
   return (
     msg.includes("Can't reach database") ||
-    msg.includes('P1001') || msg.includes('P1002') || msg.includes('P1008') ||
-    msg.includes('P2003') || msg.includes('P2021') ||
-    msg.includes('localhost:5432')
+    msg.includes('localhost:5432') ||
+    SOFT_CODES.some((c) => code === c || msg.includes(c))
   );
 }
 

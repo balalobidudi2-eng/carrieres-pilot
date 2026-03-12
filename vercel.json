@@ -4,6 +4,12 @@
   "functions": {
     "src/app/api/applications/auto-fill/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/offers/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/offers/recommended/route.ts": {
+      "maxDuration": 30
     }
   }
 }

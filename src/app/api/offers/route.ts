@@ -102,7 +102,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  await incrementUsage(userId, 'job_search');
+  // Non-fatal: quota tracking must never crash the route after results are fetched
+  await incrementUsage(userId, 'job_search').catch((err) =>
+    console.warn('[GET /api/offers] incrementUsage failed (non-fatal):', err instanceof Error ? err.message : err)
+  );
 
   return NextResponse.json(offers, {
     headers: errors.length > 0 ? { 'X-Source-Warnings': errors.join(' | ') } : {},
