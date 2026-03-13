@@ -1,4 +1,32 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright-core';
+import chromiumMin from '@sparticuz/chromium-min';
+
+// Remote tarball for the serverless Chromium binary (Vercel / Lambda).
+// Must match the installed @sparticuz/chromium-min major version (143).
+const CHROMIUM_REMOTE_URL =
+  process.env.CHROMIUM_EXECUTABLE_PATH ||
+  'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar';
+
+async function launchBrowser(): Promise<Browser> {
+  if (process.env.NODE_ENV === 'production') {
+    const executablePath = await chromiumMin.executablePath(CHROMIUM_REMOTE_URL);
+    return chromium.launch({
+      executablePath,
+      headless: true,
+      args: chromiumMin.args,
+    });
+  }
+  // Local dev — use playwright's own bundled Chromium (installed via `npx playwright install`)
+  return chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
+    ],
+  });
+}
 
 export interface LoginConfig {
   loginUrl: string;
@@ -71,15 +99,7 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
   let browser: Browser | null = null;
 
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-blink-features=AutomationControlled',
-      ],
-    });
+    browser = await launchBrowser();
 
     const context = await browser.newContext({
       userAgent:
@@ -190,10 +210,7 @@ export async function loginWithCookies(
 ): Promise<{ context: BrowserContext; page: Page; browser: Browser } | null> {
   let browser: Browser | null = null;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    });
+    browser = await launchBrowser();
 
     const context = await browser.newContext();
     const cookies = JSON.parse(cookiesJson) as Parameters<BrowserContext['addCookies']>[0];
