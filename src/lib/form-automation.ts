@@ -187,13 +187,21 @@ ${signature}`;
  * compatible with AWS Lambda / Vercel runtimes.
  */
 async function getChromiumPath(): Promise<{ executablePath: string; args: string[] }> {
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  // NODE_ENV is 'development' when running `npm run dev` locally,
+  // even if VERCEL="1" is present in .env.local (pulled from Vercel CLI).
+  // Only use the serverless Chromium binary on actual deployed instances.
+  const isActuallyServerless =
+    (process.env.VERCEL === '1' || !!process.env.AWS_LAMBDA_FUNCTION_NAME) &&
+    process.env.NODE_ENV !== 'development';
+
+  if (isActuallyServerless) {
     // Serverless: use the stripped chromium binary from @sparticuz/chromium-min
     const chromiumMod = await import('@sparticuz/chromium-min');
     const chromium = chromiumMod.default;
     // Download the binary from the CDN the first time, then cache in /tmp
+    // URL must match the installed @sparticuz/chromium-min version (143.0.4)
     const executablePath = await chromium.executablePath(
-      `https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar`,
+      `https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar`,
     );
     return { executablePath, args: chromium.args };
   }
