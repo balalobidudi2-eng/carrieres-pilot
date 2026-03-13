@@ -163,7 +163,15 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
     // Check for error messages on the page
     const pageText = (await page.textContent('body').catch(() => '')) ?? '';
     const lowerText = pageText.toLowerCase();
-    const isOnLoginPage = currentUrl.includes('login') || currentUrl.includes('connexion') || currentUrl.includes('signin');
+    // "Still on login page" if URL contains login keywords OR if URL hasn't moved from where we started
+    // (handles SPAs like candidat.meteojob.com whose base URL contains no login keyword)
+    const normalizedCurrent = currentUrl.replace(/\/$/, '');
+    const normalizedLogin = config.loginUrl.replace(/\/$/, '');
+    const isOnLoginPage =
+      normalizedCurrent.includes('login') ||
+      normalizedCurrent.includes('connexion') ||
+      normalizedCurrent.includes('signin') ||
+      normalizedCurrent === normalizedLogin;
     const hasErrorSignal =
       isOnLoginPage &&
       (lowerText.includes('incorrect') ||
