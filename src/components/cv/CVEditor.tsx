@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -18,6 +18,8 @@ import {
   Code,
   Globe,
   Award,
+  Upload,
+  ImageOff,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +45,8 @@ const SECTIONS = [
 export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   const [openSections, setOpenSections] = useState<string[]>(['personal', 'summary']);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [photo, setPhoto] = useState<string | undefined>((cv.content as any)?.personal?.photo ?? undefined);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const { register, watch, setValue, getValues, control } = useForm<CVContent>({
     defaultValues: cv.content,
@@ -96,7 +100,20 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
 
   const handleSave = () => {
     setAutoSaveStatus('saving');
-    saveMutation.mutate(getValues());
+    const values = getValues();
+    // Inject photo into personal section before saving
+    const withPhoto = { ...values, personal: { ...(values.personal ?? {}), photo } };
+    saveMutation.mutate(withPhoto as CVContent);
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Fichier non supporté — utilisez PNG, JPG ou WebP'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Image trop grande — maximum 2 Mo'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhoto(ev.target?.result as string);
+    reader.readAsDataURL(file);
   };
 
   const toggleSection = (id: string) => {
@@ -147,6 +164,48 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
             open={openSections.includes('personal')}
             onToggle={() => toggleSection('personal')}
           >
+            {/* Photo upload */}
+            <div className="mb-5 flex items-start gap-4">
+              <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-[#F1F5F9] border-2 border-dashed border-[#CBD5E1] flex items-center justify-center shrink-0">
+                {photo ? (
+                  <img src={photo} alt="Photo de profil" className="w-full h-full object-cover" />
+                ) : (
+                  <User size={28} className="text-[#CBD5E1]" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-[#1E293B] mb-1">Photo de profil <span className="text-xs font-normal text-[#94A3B8]">(optionnel)</span></p>
+                <p className="text-xs text-[#64748B] mb-2">PNG, JPG ou WebP — max 2 Mo. Visible dans l&apos;aperçu et le PDF généré.</p>
+                <div className="flex gap-2">
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-[#CBD5E1] rounded-btn text-[#475569] hover:border-accent hover:text-accent transition-colors bg-white"
+                  >
+                    <Upload size={12} />
+                    {photo ? 'Changer la photo' : 'Importer une photo'}
+                  </button>
+                  {photo && (
+                    <button
+                      type="button"
+                      onClick={() => setPhoto(undefined)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-red-200 rounded-btn text-red-400 hover:bg-red-50 transition-colors"
+                    >
+                      <ImageOff size={12} />
+                      Supprimer
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <Input label="Prénom" {...register('personal.firstName')} placeholder="Sophie" />
               <Input label="Nom" {...register('personal.lastName')} placeholder="Martin" />
@@ -393,19 +452,25 @@ function Section({
 
 function CVPreview({ content }: { content: CVContent }) {
   const p = content.personal;
+  const photo = (p as any)?.photo;
   return (
     <div className="text-[11px] text-[#1E293B] space-y-4">
       {/* Header */}
-      <div className="border-b-2 border-accent pb-3">
+      <div className="border-b-2 border-accent pb-3 flex items-start gap-3">
+        {photo && (
+          <img src={photo} alt="Photo" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+        )}
+        <div className="flex-1">
         <h1 className="text-xl font-bold font-heading">
           {[p?.firstName, p?.lastName].filter(Boolean).join(' ') || 'Prénom Nom'}
         </h1>
         <p className="text-accent font-semibold">{p?.title || 'Titre professionnel'}</p>
         {(p?.email || p?.phone || p?.city) && (
-          <p className="text-[#64748B] text-[10px] mt-0.5">
-            {[p?.email, p?.phone, p?.city].filter(Boolean).join(' · ')}
-          </p>
-        )}
+            <p className="text-[#64748B] text-[10px] mt-0.5">
+              {[p?.email, p?.phone, p?.city].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
       </div>
 
       {content.summary && (

@@ -29,10 +29,14 @@ export async function searchAdzunaOffers({
   keywords,
   contract,
   distance,
+  location,
+  resultsPerPage = 20,
 }: {
   keywords?: string;
   contract?: string;
   distance?: number;
+  location?: string;
+  resultsPerPage?: number;
 }): Promise<ReturnType<typeof normalizeAdzunaOffer>[]> {
   const appId = process.env.ADZUNA_APP_ID!.trim();
   const appKey = process.env.ADZUNA_APP_KEY!.trim();
@@ -40,10 +44,11 @@ export async function searchAdzunaOffers({
   const params = new URLSearchParams({
     app_id: appId,
     app_key: appKey,
-    results_per_page: '20',
+    results_per_page: String(resultsPerPage),
   });
 
   if (keywords) params.set('what', keywords);
+  if (location) params.set('where', location);
   if (distance) params.set('distance', String(distance));
   if (contract) {
     const contractMap: Record<string, string> = {

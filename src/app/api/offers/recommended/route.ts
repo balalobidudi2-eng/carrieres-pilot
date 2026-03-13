@@ -31,15 +31,16 @@ export async function GET(req: NextRequest) {
     where: { id: userId },
     select: {
       currentTitle: true, skills: true, targetSectors: true,
-      targetContract: true, targetLocations: true,
+      targetContract: true, targetLocations: true, dreamJob: true,
     },
   });
 
-  // Build search query from explicit param or user profile
-  // P4: use title + skills + sectors + location for better profile-based matching
+  // dreamJob has highest priority — it is the user's explicit preferred job title.
+  // Falls back to currentTitle, then skills and sectors.
   const profileTerms = searchQuery ? [searchQuery] : [
+    user?.dreamJob,
     user?.currentTitle,
-    ...(user?.skills?.slice(0, 3) ?? []),
+    ...(user?.skills?.slice(0, 2) ?? []),
     ...(user?.targetSectors?.slice(0, 1) ?? []),
   ].filter(Boolean);
   const keywords = profileTerms.join(' ');

@@ -49,9 +49,9 @@ export async function GET(req: NextRequest) {
     typeContrat: contract ? contractMap[contract] ?? undefined : undefined,
     distance,
     commune,
-    range: '0-49' as const,
+    range: '0-9' as const,
   };
-  const adzunaParams = { keywords, contract, distance };
+  const adzunaParams = { keywords, contract, distance, location: commune, resultsPerPage: 10 };
 
   if (source === 'both') {
     // Mode admin : agrégation des deux sources en parallèle
@@ -79,24 +79,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `France Travail: ${err instanceof Error ? err.message : 'Erreur inconnue'}` }, { status: 502 });
     }
   } else {
-    // Comportement par défaut : France Travail d'abord, Adzuna en fallback
-    if (hasFT) {
-      try {
-        const result = await searchOffers(ftParams);
-        offers = result.resultats.map(normalizeOffer);
-      } catch (err) {
-        console.warn('[offers] France Travail failed:', err instanceof Error ? err.message : err);
-        errors.push(`France Travail: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-      }
-    }
-    if (offers.length === 0 && hasAdzuna) {
-      try {
-        offers = await searchAdzunaOffers(adzunaParams) as NormalizedOffer[];
-      } catch (err) {
-        console.warn('[offers] Adzuna also failed:', err instanceof Error ? err.message : err);
-        errors.push(`Adzuna: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-      }
-    }
+    // Comportement par défaut : 10 résultats FT + 10 résultats Adzuna = 20 total
+    const [ftResult, adzunaResult] = await Promise.allSettled([
+      hasFT ? searchOffers(ftParams).then((r) => r.resultats.map(normalizeOffer)) : Promise.resolve([]),
+      hasAdzuna ? searchAdzunaOffers(adzunaParams) : Promise.resolve([]),
+    ]);
+    if (ftResult.status === 'fulfilled') offers.push(...ftResult.value.slice(0, 10));
+    else errors.push(`France Travail: ${ftResult.reason instanceof Error ? ftResult.reason.message : 'Erreur inconnue'}`);
+    if (adzunaResult.status === 'fulfilled') offers.push(...(adzunaResult.value as NormalizedOffer[]).slice(0, 10));
+    else errors.push(`Adzuna: ${adzunaResult.reason instanceof Error ? adzunaResult.reason.message : 'Erreur inconnue'}`);
     if (offers.length === 0 && !hasFT && !hasAdzuna) {
       return NextResponse.json({ error: 'Aucune source d\'offres configurée' }, { status: 503 });
     }

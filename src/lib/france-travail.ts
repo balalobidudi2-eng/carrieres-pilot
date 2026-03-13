@@ -96,8 +96,14 @@ export async function searchOffers(params: OfferSearchParams): Promise<FTSearchR
   const token = await getAccessToken();
 
   const qs = new URLSearchParams();
-  if (params.motsCles) qs.set('motsCles', params.motsCles);
-  if (params.commune) qs.set('commune', params.commune);
+  // Merge commune (city name) into motsCles for text-based location filtering.
+  // The FT `commune` param requires a 5-digit INSEE code — plain city names are ignored.
+  // We include the city in motsCles as a pragmatic workaround (no geocoding required).
+  const cityName = params.commune && !/^\d{5}$/.test(params.commune) ? params.commune : undefined;
+  const mergedKeywords = [params.motsCles, cityName].filter(Boolean).join(' ') || undefined;
+  if (mergedKeywords) qs.set('motsCles', mergedKeywords);
+  // Only pass commune if it's a real INSEE code
+  if (params.commune && /^\d{5}$/.test(params.commune)) qs.set('commune', params.commune);
   if (params.codeROME) qs.set('codeROME', params.codeROME);
   if (params.typeContrat) qs.set('typeContrat', params.typeContrat);
   if (params.experience) qs.set('experience', params.experience);

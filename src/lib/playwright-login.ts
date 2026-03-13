@@ -3,9 +3,10 @@ import chromiumMin from '@sparticuz/chromium-min';
 
 // Remote tarball for the serverless Chromium binary (Vercel / Lambda).
 // Must match the installed @sparticuz/chromium-min major version (143).
+// Since v135, the filename includes the architecture suffix (.x64.tar / .arm64.tar).
 const CHROMIUM_REMOTE_URL =
   process.env.CHROMIUM_EXECUTABLE_PATH ||
-  'https://github.com/Sparticuz/chromium/releases/download/v143.0.0/chromium-v143.0.0-pack.tar';
+  'https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar';
 
 async function launchBrowser(): Promise<Browser> {
   if (process.env.NODE_ENV === 'production') {
@@ -57,10 +58,11 @@ const SITE_SELECTORS: Record<string, SiteSelectors> = {
     successIndicator: '[data-testid="UserDropdownButton"], .icl-Avatar, [aria-label*="compte"]',
   },
   meteojob: {
-    emailSelector: 'input[name="email"], input[type="email"]',
-    passwordSelector: 'input[name="password"], input[type="password"]',
+    // CleverConnect Angular SPA — uses formcontrolname attributes
+    emailSelector: 'input[formcontrolname="email"], input[name="email"], input[type="email"]',
+    passwordSelector: 'input[formcontrolname="password"], input[name="password"], input[type="password"]',
     submitSelector: 'button[type="submit"]',
-    successIndicator: '.user-menu, .account-menu, [href*="logout"], [href*="deconnexion"]',
+    successIndicator: '[href*="mon-espace"], [href*="deconnexion"], .cc-user-menu, .user-menu, [class*="logout"]',
   },
   monster: {
     emailSelector: 'input[name="email"], input[type="email"]',
@@ -123,7 +125,8 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
     }
 
     // Fill email
-    const emailField = await page.$(selectors.emailSelector);
+    // Use waitForSelector so SPAs (Angular, React) have time to render the form
+    const emailField = await page.waitForSelector(selectors.emailSelector, { timeout: 12000 }).catch(() => null);
     if (!emailField) {
       return { success: false, message: 'Champ email introuvable sur la page de connexion' };
     }
@@ -132,7 +135,7 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
     console.log('[playwright-login] Email filled');
 
     // Fill password
-    const passwordField = await page.$(selectors.passwordSelector);
+    const passwordField = await page.waitForSelector(selectors.passwordSelector, { timeout: 5000 }).catch(() => null);
     if (!passwordField) {
       return { success: false, message: 'Champ mot de passe introuvable' };
     }
@@ -141,7 +144,7 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
     console.log('[playwright-login] Password filled');
 
     // Submit
-    const submitBtn = await page.$(selectors.submitSelector);
+    const submitBtn = await page.waitForSelector(selectors.submitSelector, { timeout: 5000 }).catch(() => null);
     if (!submitBtn) {
       return { success: false, message: 'Bouton de connexion introuvable' };
     }

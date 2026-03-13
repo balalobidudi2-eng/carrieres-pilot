@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
         languages: true, portfolio: true, availability: true, objectives: true,
         experiences: true, formations: true,
         workMode: true, companySize: true, companyType: true,
-        travelWillingness: true, relocationWillingness: true,
+        travelWillingness: true, relocationWillingness: true, dreamJob: true,
       },
     });
     if (!user) return NextResponse.json({ error: 'Session expirée' }, { status: 401 });
@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest) {
     'location', 'bio', 'targetSalary', 'targetContract', 'targetSectors',
     'targetLocations', 'skills', 'onboardingDone', 'avatar',
     'languages', 'portfolio', 'availability', 'objectives', 'experiences', 'formations',
-    'workMode', 'companySize', 'companyType', 'travelWillingness', 'relocationWillingness',
+    'workMode', 'companySize', 'companyType', 'travelWillingness', 'relocationWillingness', 'dreamJob',
   ];
   const data: Record<string, unknown> = {};
   for (const key of allowed) {

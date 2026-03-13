@@ -22,7 +22,6 @@ import {
   ArrowRight,
   Sparkles,
   Bell,
-  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -62,14 +61,8 @@ export default function DashboardPage() {
     queryFn: () => api.get('/offers/recommended').then((r) => r.data as { id: string; title: string; company: string; location: string; matchScore?: number; url?: string }[]),
   });
 
-  const { data: unreadNotifications = [] } = useQuery<{ id: string }[]>({
-    queryKey: ['job-notifications-unread'],
-    queryFn: () => api.get('/notifications?unread=1').then((r) => r.data),
-    staleTime: 60_000,
-  });
-
-  // Nombre total de nouvelles offres : notifs non lues ou offres recommandées
-  const newOffersCount = unreadNotifications.length > 0 ? unreadNotifications.length : recommended.length;
+  // Nouvelles offres du jour — cap strict à 20, basé sur les offres recommandées
+  const dailyOfferCount = Math.min(recommended.length, 20);
 
   const statCards = [
     {
@@ -151,8 +144,8 @@ export default function DashboardPage() {
             })}
       </motion.div>
 
-      {/* ── Job Alert Banner ──────────────────────────────────────── */}
-      {recommended.length > 0 && (
+      {/* ── Daily Job Offer Banner ───────────────────────────────────────── */}
+      {dailyOfferCount > 0 && (
         <motion.div variants={fadeInUp} className="bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/30 rounded-card px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-3 flex-1">
             <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center shrink-0">
@@ -160,46 +153,16 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm font-bold text-[#1E293B]">
-                {recommended.length} nouvelle{recommended.length > 1 ? 's' : ''} offre{recommended.length > 1 ? 's' : ''} correspondent à votre profil aujourd&apos;hui
-                {unreadNotifications.length > 0 && (
-                  <span className="ml-2 bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full align-middle">
-                    {unreadNotifications.length} non lue{unreadNotifications.length > 1 ? 's' : ''}
-                  </span>
-                )}
+                {dailyOfferCount} nouvelle{dailyOfferCount > 1 ? 's' : ''} offre{dailyOfferCount > 1 ? 's' : ''} correspondent à votre profil aujourd&apos;hui
               </p>
-              <p className="text-xs text-[#64748B]">Basé sur vos compétences et préférences enregistrées</p>
+              <p className="text-xs text-[#64748B]">Basé sur vos compétences et préférences — mis à jour chaque jour (max 20)</p>
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Link href="/notifications" className="flex items-center gap-1.5 px-4 py-2 rounded-btn border border-accent text-accent text-sm font-semibold hover:bg-accent hover:text-white transition-all">
-              Voir les notifications <ArrowRight size={13} />
+            <Link href="/offres?tab=recommended" className="flex items-center gap-1.5 px-4 py-2 rounded-btn border border-accent text-accent text-sm font-semibold hover:bg-accent hover:text-white transition-all">
+              Voir les offres <ArrowRight size={13} />
             </Link>
           </div>
-        </motion.div>
-      )}
-
-      {/* ── Auto-Apply Suggestion Banner ─────────────────────────── */}
-      {newOffersCount >= 5 && (
-        <motion.div variants={fadeInUp} className="bg-gradient-to-r from-violet-50 to-accent/5 border border-violet-200 rounded-card px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="w-9 h-9 bg-violet-500 rounded-xl flex items-center justify-center shrink-0">
-              <Zap size={16} className="text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-[#1E293B]">
-                {newOffersCount} nouvelles offres correspondent à votre profil.
-                <br />
-                <span className="font-normal text-[#475569]">Voulez-vous candidater automatiquement ?</span>
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/offres?tab=recommended&autoApply=1"
-            className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-btn text-sm font-semibold hover:bg-violet-700 transition-colors whitespace-nowrap"
-          >
-            <Zap size={13} />
-            Lancer les candidatures auto
-          </Link>
         </motion.div>
       )}
 
@@ -312,7 +275,7 @@ export default function DashboardPage() {
           style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}
         >
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#E2E8F0]">
-            <h2 className="font-heading font-semibold text-[#1E293B] text-base">Recommandées IA</h2>
+            <h2 className="font-heading font-semibold text-[#1E293B] text-base">Meilleures offres du jour</h2>
             <Link href="/offres">
               <Button variant="ghost" size="sm" className="text-xs">
                 Voir <ArrowRight size={13} />

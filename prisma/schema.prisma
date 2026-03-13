@@ -63,6 +63,7 @@ model User {
   companyType     String?
   travelWillingness    Boolean?
   relocationWillingness Boolean?
+  dreamJob             String?
   plan            Plan     @default(FREE)
   emailVerified            Boolean   @default(false)
   emailVerificationToken   String?   @unique

@@ -1,9 +1,10 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/axios';
-import { Shield, Lock, Info, Key, Server, Users, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Shield, Lock, Info, Key, Server, Users, CheckCircle, XCircle, RefreshCw, Database } from 'lucide-react';
 
 interface PlatformConfig {
   envStatus: {
@@ -36,6 +37,16 @@ export default function AdminParametresPage() {
     enabled: adminLevel >= 4,
     staleTime: 5 * 60 * 1000,
   });
+
+  const [apiSource, setApiSource] = useState<'both' | 'france_travail' | 'adzuna'>('both');
+  useEffect(() => {
+    const saved = localStorage.getItem('cp_api_source');
+    if (saved === 'france_travail' || saved === 'adzuna' || saved === 'both') setApiSource(saved);
+  }, []);
+  function handleApiSourceChange(value: 'both' | 'france_travail' | 'adzuna') {
+    setApiSource(value);
+    localStorage.setItem('cp_api_source', value);
+  }
 
   if (adminLevel < 4) {
     return (
@@ -156,6 +167,43 @@ export default function AdminParametresPage() {
         </div>
         <p className="text-xs text-[#94A3B8] mt-4">
           Pour modifier le niveau d&apos;un utilisateur, allez dans <strong>Utilisateurs</strong> → colonne Actions → sélecteur de niveau.
+        </p>
+      </div>
+
+      {/* Source des offres d'emploi */}
+      <div className="bg-white dark:bg-[#112240] rounded-xl border border-[#E2E8F0] dark:border-white/10 p-5">
+        <h2 className="text-sm font-semibold text-[#1E293B] dark:text-white mb-1 flex items-center gap-2">
+          <Database size={16} className="text-emerald-500" />
+          Source des offres d&apos;emploi
+        </h2>
+        <p className="text-xs text-[#64748B] mb-4">
+          Choisissez quelle(s) API utiliser pour les recherches d&apos;offres. Ce réglage s&apos;applique uniquement pendant votre session admin.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {([
+            { value: 'both', label: 'France Travail + Adzuna', desc: '10 offres de chaque (recommandé)' },
+            { value: 'france_travail', label: 'France Travail uniquement', desc: 'API officielle Pôle Emploi' },
+            { value: 'adzuna', label: 'Adzuna uniquement', desc: 'Agrégateur international' },
+          ] as const).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleApiSourceChange(opt.value)}
+              className={`text-left p-3 rounded-lg border transition-all ${
+                apiSource === opt.value
+                  ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-500/10'
+                  : 'border-[#E2E8F0] dark:border-white/10 hover:border-emerald-300'
+              }`}
+            >
+              <div className={`text-sm font-semibold ${apiSource === opt.value ? 'text-emerald-700 dark:text-emerald-400' : 'text-[#1E293B] dark:text-white'}`}>
+                {opt.label}
+              </div>
+              <div className="text-xs text-[#64748B] mt-0.5">{opt.desc}</div>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-[#94A3B8] mt-3">
+          La sélection est sauvegardée localement dans votre navigateur. Les utilisateurs non-admin utilisent toujours le mode <strong>France Travail + Adzuna</strong>.
         </p>
       </div>
 

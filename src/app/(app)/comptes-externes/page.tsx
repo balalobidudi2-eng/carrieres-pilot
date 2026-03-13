@@ -14,7 +14,7 @@ import { BrowserViewer } from '@/components/BrowserViewer';
 const SUPPORTED_SITES = [
   { id: 'indeed',    label: 'Indeed',     emoji: '🔵', authType: 'otp' as const,      loginUrl: 'https://fr.indeed.com/account/login' },
   { id: 'hellowork', label: 'HelloWork',  emoji: '👋', authType: 'otp' as const,      loginUrl: 'https://www.hellowork.com/fr-fr/connexion.html' },
-  { id: 'meteojob',  label: 'Météo Job',  emoji: '☀️', authType: 'password' as const, loginUrl: 'https://www.meteojob.com/connexion' },
+  { id: 'meteojob',  label: 'Météo Job',  emoji: '☀️', authType: 'password' as const, loginUrl: 'https://candidat.meteojob.com' },
   { id: 'monster',   label: 'Monster',    emoji: '👾', authType: 'password' as const, loginUrl: 'https://www.monster.fr/connexion' },
   { id: 'linkedin',  label: 'LinkedIn',   emoji: '💼', authType: 'password' as const, loginUrl: 'https://www.linkedin.com/login' },
   { id: 'custom',    label: 'Autre site', emoji: '🌐', authType: 'password' as const, loginUrl: '' },
@@ -222,17 +222,17 @@ export default function ExternalAccountsPage() {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-cyan-500/10 rounded-xl">
-            <KeyRound size={20} className="text-cyan-400" />
+          <div className="p-2 bg-accent/10 rounded-xl">
+            <KeyRound size={20} className="text-accent" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Mes comptes externes</h1>
+          <h1 className="text-2xl font-bold text-[#1E293B]">Mes comptes externes</h1>
         </div>
-        <p className="text-[#94A3B8] text-sm">
+        <p className="text-[#64748B] text-sm">
           Connectez vos comptes une fois. CareerPilot postule automatiquement sans vous redemander de vous reconnecter.
         </p>
-        <div className="mt-3 flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
-          <Shield size={14} className="text-blue-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-300">
+        <div className="mt-3 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <Shield size={14} className="text-blue-500 shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-700">
             Credentials chiffrés AES-256. Sessions OTP (Indeed, HelloWork) stockées en tant que cookies chiffrés — jamais accessibles en clair.
           </p>
         </div>
@@ -241,9 +241,9 @@ export default function ExternalAccountsPage() {
       {/* Status banner */}
       {statusMsg && (
         <div className={`mb-5 px-4 py-3 rounded-xl text-sm border ${
-          statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-          statusMsg.type === 'error'   ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-                                         'bg-blue-500/10 border-blue-500/30 text-blue-400'
+          statusMsg.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' :
+          statusMsg.type === 'error'   ? 'bg-red-50 border-red-200 text-red-700' :
+                                         'bg-blue-50 border-blue-200 text-blue-700'
         }`}>
           {statusMsg.text}
         </div>
@@ -268,36 +268,36 @@ export default function ExternalAccountsPage() {
               const expiring = isOtpAccount && isSessionExpiring(account.lastLoginAt);
 
               return (
-                <div key={account.id} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3 gap-3">
+                <div key={account.id} className="flex items-center justify-between bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 gap-3" style={{ boxShadow: '0 1px 4px rgba(15,52,96,0.06)' }}>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-white text-sm">{account.siteLabel}</span>
+                      <span className="font-semibold text-[#1E293B] text-sm">{account.siteLabel}</span>
                       {isOtpAccount && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400">OTP</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-600">OTP</span>
                       )}
                       {account.isValid ? (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-400">
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
                           <CheckCircle size={10} /> Connecté
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600">
                           <XCircle size={10} /> Non vérifié
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-[#64748B] mt-0.5 truncate">{account.email}</p>
                     {!isOtpAccount && account.lastTestedAt && (
-                      <p className="text-xs text-[#475569] mt-0.5">
+                      <p className="text-xs text-[#94A3B8] mt-0.5">
                         Testé le {new Date(account.lastTestedAt).toLocaleDateString('fr-FR')}
                       </p>
                     )}
                     {isOtpAccount && account.lastLoginAt && (
-                      <p className="text-xs text-[#475569] mt-0.5 flex items-center gap-1">
+                      <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1">
                         <Clock size={10} /> Session du {new Date(account.lastLoginAt).toLocaleDateString('fr-FR')}
                       </p>
                     )}
                     {expiring && (
-                      <p className="text-xs text-amber-400 mt-0.5 flex items-center gap-1">
+                      <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
                         <AlertTriangle size={10} /> Session expirée — cliquez Renouveler
                       </p>
                     )}
@@ -306,7 +306,7 @@ export default function ExternalAccountsPage() {
                     {isOtpAccount ? (
                       <button
                         onClick={() => handleRenew(account)}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 transition-colors"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors font-medium"
                       >
                         Renouveler
                       </button>
@@ -314,14 +314,14 @@ export default function ExternalAccountsPage() {
                       <button
                         onClick={() => handleTest(account)}
                         disabled={testingId === account.id}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-accent hover:bg-accent/5 disabled:opacity-50 transition-colors font-medium"
                       >
                         {testingId === account.id ? <Loader2 size={12} className="animate-spin" /> : 'Tester'}
                       </button>
                     )}
                     <button
                       onClick={() => handleDelete(account)}
-                      className="text-xs px-2.5 py-1.5 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
+                      className="text-xs px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -333,7 +333,7 @@ export default function ExternalAccountsPage() {
 
           <button
             onClick={() => setStep('select-site')}
-            className="w-full border border-dashed border-white/20 rounded-xl py-3 text-[#64748B] hover:border-cyan-500/50 hover:text-cyan-400 transition-colors text-sm flex items-center justify-center gap-2"
+            className="w-full border border-dashed border-[#CBD5E1] rounded-xl py-3 text-[#64748B] hover:border-accent/50 hover:text-accent transition-colors text-sm flex items-center justify-center gap-2 bg-white"
           >
             <Plus size={15} /> Connecter un compte
           </button>
@@ -343,23 +343,23 @@ export default function ExternalAccountsPage() {
       {/* ── SELECT SITE ──────────────────────────────────────────────────── */}
       {step === 'select-site' && (
         <div className="space-y-3">
-          <p className="text-sm text-[#94A3B8] mb-2">Quel site souhaitez-vous connecter ?</p>
+          <p className="text-sm text-[#64748B] mb-2">Quel site souhaitez-vous connecter ?</p>
           {SUPPORTED_SITES.map(site => (
             <button
               key={site.id}
               onClick={() => { setSelectedSite(site); setStep('enter-credentials'); }}
-              className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-left transition-colors"
+              className="w-full flex items-center gap-3 bg-white hover:bg-[#F7F8FC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-left transition-colors"
             >
               <span className="text-2xl">{site.emoji}</span>
               <div>
-                <div className="font-medium text-white text-sm">{site.label}</div>
+                <div className="font-semibold text-[#1E293B] text-sm">{site.label}</div>
                 <div className="text-xs text-[#64748B]">
                   {site.authType === 'otp' ? 'Connexion par code email (OTP)' : 'Email + mot de passe'}
                 </div>
               </div>
             </button>
           ))}
-          <button onClick={resetWizard} className="w-full text-center text-sm text-[#475569] hover:text-[#94A3B8] py-2 flex items-center justify-center gap-1">
+          <button onClick={resetWizard} className="w-full text-center text-sm text-[#64748B] hover:text-[#1E293B] py-2 flex items-center justify-center gap-1 transition-colors">
             <ChevronLeft size={14} /> Retour
           </button>
         </div>
@@ -370,11 +370,11 @@ export default function ExternalAccountsPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-3 mb-1">
             <span className="text-2xl">{selectedSite.emoji}</span>
-            <h2 className="text-lg font-semibold text-white">Connexion {selectedSite.label}</h2>
+            <h2 className="text-lg font-semibold text-[#1E293B]">Connexion {selectedSite.label}</h2>
           </div>
 
           {isOtp && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 text-sm text-amber-300">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
               <strong>{selectedSite.label}</strong> envoie un code de vérification par email.
               Cliquez sur "Ouvrir {selectedSite.label}" — une fenêtre apparaîtra ici même.
               Connectez-vous normalement, CareerPilot capture votre session automatiquement.
@@ -383,39 +383,39 @@ export default function ExternalAccountsPage() {
 
           {selectedSite.id === 'custom' && (
             <div>
-              <label className="block text-xs text-[#94A3B8] mb-1">URL de connexion</label>
+              <label className="block text-xs font-medium text-[#475569] mb-1">URL de connexion</label>
               <input
                 type="url"
                 placeholder="https://site.com/login"
                 value={customLoginUrl}
                 onChange={e => setCustomLoginUrl(e.target.value)}
-                className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-[#475569] focus:outline-none focus:border-cyan-500/60"
+                className="w-full bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 text-[#1E293B] text-sm placeholder-[#94A3B8] focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs text-[#94A3B8] mb-1">Email</label>
+            <label className="block text-xs font-medium text-[#475569] mb-1">Email</label>
             <input
               type="email"
               placeholder="votre@email.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
               autoComplete="off"
-              className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-[#475569] focus:outline-none focus:border-cyan-500/60"
+              className="w-full bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 text-[#1E293B] text-sm placeholder-[#94A3B8] focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
             />
           </div>
 
           {!isOtp && (
             <div>
-              <label className="block text-xs text-[#94A3B8] mb-1">Mot de passe</label>
+              <label className="block text-xs font-medium text-[#475569] mb-1">Mot de passe</label>
               <input
                 type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete="new-password"
-                className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-[#475569] focus:outline-none focus:border-cyan-500/60"
+                className="w-full bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 text-[#1E293B] text-sm placeholder-[#94A3B8] focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
               />
             </div>
           )}
@@ -440,7 +440,7 @@ export default function ExternalAccountsPage() {
             )}
             <button
               onClick={() => setStep('select-site')}
-              className="px-4 py-3 border border-white/20 rounded-xl text-[#94A3B8] hover:text-white text-sm transition-colors"
+              className="px-4 py-3 border border-[#E2E8F0] rounded-xl text-[#64748B] hover:text-[#1E293B] text-sm transition-colors"
             >
               Retour
             </button>
@@ -454,15 +454,16 @@ export default function ExternalAccountsPage() {
           <div className="flex items-center gap-3">
             <span className="text-2xl">{selectedSite.emoji}</span>
             <div>
-              <h2 className="text-lg font-semibold text-white">Connectez-vous à {selectedSite.label}</h2>
+              <h2 className="text-lg font-semibold text-[#1E293B]">Connectez-vous à {selectedSite.label}</h2>
               <p className="text-xs text-[#64748B]">
-                Entrez votre email, attendez le code OTP, saisissez-le. Puis cliquez sur "J'ai fini".
+                Entrez votre email, attendez le code OTP, saisissez-le. Puis cliquez sur &quot;J&apos;ai fini&quot;.
               </p>
             </div>
           </div>
 
           <BrowserViewer
             wsUrl={wsUrl}
+            sessionId={sessionId}
             onConfirm={handleCaptureCookies}
             loading={busy}
           />
@@ -473,7 +474,7 @@ export default function ExternalAccountsPage() {
       {step === 'confirming' && (
         <div className="text-center py-16 space-y-4">
           <div className="text-5xl animate-pulse">⏳</div>
-          <p className="text-[#94A3B8]">Vérification de votre connexion en cours…</p>
+          <p className="text-[#64748B]">Vérification de votre connexion en cours…</p>
         </div>
       )}
 

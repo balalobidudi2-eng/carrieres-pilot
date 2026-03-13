@@ -56,7 +56,14 @@ function OffresPageContent() {
   const [committed, setCommitted] = useState({ query: searchParams.get('q') ?? '', contracts: [] as string[], sectors: [] as string[], distance: 0, locationMode: 'france' as 'france' | 'custom', customLocation: '', apiSource: 'both' as 'france_travail' | 'adzuna' | 'both' });
 
   // Défaut 'both' : fallback Adzuna si France Travail est indisponible
-  const [apiSource, setApiSource] = useState<'france_travail' | 'adzuna' | 'both'>('both');
+  // Admins: sync with cp_api_source saved in localStorage (set from admin/parametres)
+  const [apiSource, setApiSource] = useState<'france_travail' | 'adzuna' | 'both'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cp_api_source');
+      if (saved === 'france_travail' || saved === 'adzuna' || saved === 'both') return saved;
+    }
+    return 'both';
+  });
   // Options de candidature automatique — exclusif admin ghilesaimeur951@gmail.com
   const [smtpEnabled, setSmtpEnabled] = useState(true);
   const [playwrightEnabled, setPlaywrightEnabled] = useState(true);
@@ -485,10 +492,12 @@ function OffresPageContent() {
             {t === 'recommended' ? (
               <span className="flex items-center gap-1.5">
                 <Sparkles size={13} />
-                Recommandées IA
+                Offres pour vous
               </span>
             ) : (
-              'Toutes les offres'
+              <span className="flex items-center gap-1.5">
+                Recherche manuelle
+              </span>
             )}
           </button>
         ))}
@@ -674,7 +683,9 @@ function OffresPageContent() {
                   className="px-3 py-2 border border-[#E2E8F0] rounded-btn text-xs font-semibold bg-white text-[#64748B] focus:outline-none focus:border-accent transition-colors"
                 >
                   <option value={0}>Rayon illimité</option>
+                  <option value={5}>5 km</option>
                   <option value={10}>10 km</option>
+                  <option value={15}>15 km</option>
                   <option value={25}>25 km</option>
                   <option value={50}>50 km</option>
                   <option value={100}>100 km</option>

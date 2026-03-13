@@ -60,6 +60,7 @@ const schema = z.object({
   companyType: z.string().optional(),
   travelWillingness: z.boolean().optional(),
   relocationWillingness: z.boolean().optional(),
+  dreamJob: z.string().max(150).optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -200,6 +201,7 @@ export default function ProfilPage() {
       companyType: profile?.companyType ?? '',
       travelWillingness: profile?.travelWillingness ?? false,
       relocationWillingness: profile?.relocationWillingness ?? false,
+      dreamJob: profile?.dreamJob ?? '',
     },
   });
 
@@ -478,6 +480,13 @@ export default function ProfilPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Dream Job */}
+            <div>
+              <p className="text-sm font-semibold text-[#1E293B] mb-2">Poste de rêve</p>
+              <Input label="Métier / poste souhaité" {...register('dreamJob')} placeholder="ex: Chef de projet IT, Agent de sécurité…" />
+              <p className="text-xs text-[#94A3B8] mt-1">Ce champ influence directement les recommandations IA.</p>
             </div>
 
             {/* Mobility */}

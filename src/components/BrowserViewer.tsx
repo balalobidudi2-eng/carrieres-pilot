@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { api } from '@/lib/axios';
 
 interface BrowserViewerProps {
   wsUrl: string;
+  sessionId: string;
   onConfirm: () => void;
   loading?: boolean;
 }
@@ -14,11 +16,30 @@ interface BrowserViewerProps {
  * Remplace l'iframe (bloquée par X-Frame-Options sur Indeed, LinkedIn, etc.)
  * par un flux de captures JPEG transmises depuis le microservice Railway.
  */
-export function BrowserViewer({ wsUrl, onConfirm, loading }: BrowserViewerProps) {
+export function BrowserViewer({ wsUrl, sessionId, onConfirm, loading }: BrowserViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [solving, setSolving] = useState(false);
+  const [solveStatus, setSolveStatus] = useState<string | null>(null);
+
+  async function handleSolveCaptcha() {
+    setSolving(true);
+    setSolveStatus(null);
+    try {
+      const res = await api.post<{ success: boolean; reason?: string }>('/external-accounts/solve-captcha', { sessionId });
+      const data = res.data;
+      setSolveStatus(data.success ? '✅ CAPTCHA résolu !' : data.reason === 'no_turnstile_found' ? 'ℹ️ Aucun CAPTCHA détecté sur la page' : `❌ ${data.reason ?? 'Échec'}`);
+    } catch (e: unknown) {
+      const reason = (e as { response?: { data?: { reason?: string; error?: string } } })?.response?.data?.reason
+        ?? (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? 'Erreur réseau';
+      setSolveStatus(`❌ ${reason}`);
+    } finally {
+      setSolving(false);
+    }
+  }
 
   useEffect(() => {
     setError(null);
@@ -110,6 +131,20 @@ export function BrowserViewer({ wsUrl, onConfirm, loading }: BrowserViewerProps)
       <p className="text-xs text-gray-500 text-center">
         Cliquez dans la fenêtre pour interagir · Connectez-vous normalement à votre compte
       </p>
+
+      <button
+        onClick={handleSolveCaptcha}
+        disabled={solving || loading}
+        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+      >
+        {solving
+          ? <><Loader2 size={16} className="animate-spin" /> Résolution du CAPTCHA…</>
+          : '🔄 Résoudre CAPTCHA automatiquement'}
+      </button>
+
+      {solveStatus && (
+        <p className="text-center text-sm text-gray-300">{solveStatus}</p>
+      )}
 
       <button
         onClick={onConfirm}
