@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Impossible de créer la session de navigation' }, { status: 502 });
   }
 
-  const session = await sessionRes.json() as { id: string; viewer_url: string };
+  const session = await sessionRes.json() as { id: string; sessionViewerUrl: string };
   console.log(`[start-session] Steel session créée: ${session.id} pour ${site}`);
 
   // Save account row + pending session id (cookiesJson = temp storage)
@@ -77,5 +77,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ sessionUrl: session.viewer_url, sessionId: session.id });
+  return NextResponse.json({ sessionUrl: session.sessionViewerUrl, sessionId: session.id });
 }
