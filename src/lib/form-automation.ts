@@ -39,6 +39,10 @@ export interface FormFillResult {
   message: string;
   fieldsFilledCount?: number;
   screenshotUrl?: string;
+  /** True when the offer page has no automatable form — not an error, just requires manual application */
+  requiresManual?: boolean;
+  /** The offer URL for manual fallback link */
+  url?: string;
 }
 
 // ─── Email extraction ────────────────────────────────────────────────────────
@@ -353,8 +357,10 @@ async function tryPlaywrightFill(req: FormFillRequest): Promise<FormFillResult> 
     if (filled === 0) {
       return {
         success: false,
-        status: 'failed',
-        message: `Aucun champ de formulaire détecté sur cette page. Postulez directement : ${req.applicationUrl}`,
+        requiresManual: true,
+        status: 'unsupported',
+        message: `Cette offre nécessite une candidature manuelle — aucun formulaire détectable automatiquement.`,
+        url: req.applicationUrl,
       };
     }
 

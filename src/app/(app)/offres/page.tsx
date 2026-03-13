@@ -242,12 +242,14 @@ function OffresPageContent() {
               : playwrightEnabled ? 'playwright'
               : 'both', // fallback sécurisé si les deux sont désactivés
         } : {}),
-      }).then((r) => r.data as { success: boolean; status: string; message: string }),
+      }).then((r) => r.data as { success: boolean; status: string; message: string; requiresManual?: boolean; url?: string }),
     onSuccess: (data) => {
       if (data.success) {
         toast.success('Candidature envoyée automatiquement !');
         qc.invalidateQueries({ queryKey: ['application-stats'] });
         qc.invalidateQueries({ queryKey: ['user-usage'] });
+      } else if (data.requiresManual) {
+        toast(`Candidature manuelle requise — le formulaire n'est pas automatisable sur ce site.`, { icon: 'ℹ️', duration: 6000 });
       } else {
         toast(data.message, { icon: '⚠️' });
       }
@@ -312,9 +314,10 @@ function OffresPageContent() {
                 : playwrightEnabled ? 'playwright'
                 : 'both',
           } : {}),
-        }).then((r) => r.data as { success: boolean; message: string });
+        }).then((r) => r.data as { success: boolean; message: string; requiresManual?: boolean });
         if (result.success) successCount++;
-        else failCount++;
+        else if (!result.requiresManual) failCount++;
+        // requiresManual is not counted as failure — it's an expected manual-apply case
       } catch {
         failCount++;
       }

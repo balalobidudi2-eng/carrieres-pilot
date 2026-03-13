@@ -109,5 +109,6 @@ export async function POST(req: NextRequest) {
     await incrementUsage(userId, 'auto_apply');
   }
 
-  return NextResponse.json(result, { status: result.success ? 200 : 501 });
+  // requiresManual is an expected outcome (no automatable form), not a server error — return 200
+  return NextResponse.json(result, { status: result.success || result.requiresManual ? 200 : 501 });
 }
