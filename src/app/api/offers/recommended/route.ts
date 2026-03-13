@@ -35,15 +35,12 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  // dreamJob has highest priority — it is the user's explicit preferred job title.
-  // Falls back to currentTitle, then skills and sectors.
-  const profileTerms = searchQuery ? [searchQuery] : [
-    user?.dreamJob,
-    user?.currentTitle,
-    ...(user?.skills?.slice(0, 2) ?? []),
-    ...(user?.targetSectors?.slice(0, 1) ?? []),
-  ].filter(Boolean);
-  const keywords = profileTerms.join(' ');
+  // Use a single, precise job title for the search.
+  // Combining multiple terms (skills, sectors) causes cross-domain contamination:
+  // e.g. "agent de sécurité guitare" returns unrelated music results.
+  // dreamJob has highest priority, falls back to currentTitle only.
+  const primaryJobTitle = user?.dreamJob?.trim() || user?.currentTitle?.trim() || '';
+  const keywords = searchQuery ? searchQuery : primaryJobTitle;
   const contractMap: Record<string, string> = { CDI: 'CDI', CDD: 'CDD', Stage: 'SAI', Alternance: 'MIS' };
   const typeContrat = user?.targetContract?.[0] ? contractMap[user.targetContract[0]] : undefined;
 
