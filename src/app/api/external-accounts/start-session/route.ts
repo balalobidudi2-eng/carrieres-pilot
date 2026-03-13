@@ -2,20 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export const maxDuration = 10;
+export const maxDuration = 15;
+
+const STEEL_API = 'https://api.steel.dev/v1';
 
 const SITE_CONFIG: Record<string, { label: string; loginUrl: string }> = {
-  indeed:    { label: 'Indeed',     loginUrl: 'https://fr.indeed.com/account/login' },
-  meteojob:  { label: 'Météo Job',  loginUrl: 'https://www.meteojob.com/connexion' },
-  hellowork: { label: 'HelloWork',  loginUrl: 'https://www.hellowork.com/fr-fr/connexion.html' },
-  monster:   { label: 'Monster',    loginUrl: 'https://www.monster.fr/connexion' },
-  linkedin:  { label: 'LinkedIn',   loginUrl: 'https://www.linkedin.com/login' },
+  indeed:    { label: 'Indeed',    loginUrl: 'https://fr.indeed.com/account/login' },
+  meteojob:  { label: 'Météo Job', loginUrl: 'https://www.meteojob.com/connexion' },
+  hellowork: { label: 'HelloWork', loginUrl: 'https://www.hellowork.com/fr-fr/connexion.html' },
+  monster:   { label: 'Monster',   loginUrl: 'https://www.monster.fr/connexion' },
+  linkedin:  { label: 'LinkedIn',  loginUrl: 'https://www.linkedin.com/login' },
 };
 
 /**
  * POST /api/external-accounts/start-session
- * Creates a live browser session via Browserless.io and returns an interactive URL
- * that can be embedded as an iframe so the user can log in without leaving the app.
+ * Creates an interactive Steel.dev browser session and returns:
+ *   - sessionUrl: the viewer URL to embed in an iframe (CORS-safe, designed for embedding)
+ *   - sessionId: used by capture-cookies to retrieve cookies after login
  */
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -30,18 +33,38 @@ export async function POST(req: NextRequest) {
 
   const config = SITE_CONFIG[site];
   if (!config) {
-    return NextResponse.json({ error: 'Site non supporté' }, { status: 400 });
+    return NextResponse.json({ error: `Site "${site}" non supporté` }, { status: 400 });
   }
 
-  const apiKey = process.env.BROWSERLESS_API_KEY;
+  const apiKey = process.env.STEEL_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'Service de navigation cloud non configuré (BROWSERLESS_API_KEY manquante)' }, { status: 503 });
+    return NextResponse.json({ error: 'Service de navigation non configuré (STEEL_API_KEY manquante)' }, { status: 503 });
   }
 
-  // Pre-create or update the account record so capture-cookies can find it
+  // Create an interactive Steel session — viewer_url is an iframe-safe URL
+  const sessionRes = await fetch(`${STEEL_API}/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Steel-Api-Key': apiKey },
+    body: JSON.stringify({
+      timeout: 120000,       // 2 min for the user to log in
+      is_interactive: true,  // user controls the browser via the iframe
+      initial_url: config.loginUrl,
+    }),
+  });
+
+  if (!sessionRes.ok) {
+    const err = await sessionRes.text();
+    console.error('[start-session] Steel error:', sessionRes.status, err);
+    return NextResponse.json({ error: 'Impossible de créer la session de navigation' }, { status: 502 });
+  }
+
+  const session = await sessionRes.json() as { id: string; viewer_url: string };
+  console.log(`[start-session] Steel session créée: ${session.id} pour ${site}`);
+
+  // Save account row + pending session id (cookiesJson = temp storage)
   await prisma.externalAccount.upsert({
     where: { userId_site: { userId, site } },
-    update: { email, isValid: false },
+    update: { email, isValid: false, cookiesJson: JSON.stringify({ pendingSessionId: session.id }) },
     create: {
       userId,
       site,
@@ -50,15 +73,9 @@ export async function POST(req: NextRequest) {
       email,
       passwordHash: '',
       isValid: false,
+      cookiesJson: JSON.stringify({ pendingSessionId: session.id }),
     },
   });
 
-  // Browserless live viewer URL — opens a real Chromium navigating to loginUrl
-  // The user interacts with it inside an iframe on careerpilot.fr
-  const sessionUrl =
-    `https://production-sfo.browserless.io/devtools/inspector/share` +
-    `?token=${apiKey}` +
-    `&url=${encodeURIComponent(config.loginUrl)}`;
-
-  return NextResponse.json({ sessionUrl });
+  return NextResponse.json({ sessionUrl: session.viewer_url, sessionId: session.id });
 }

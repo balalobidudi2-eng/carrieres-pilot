@@ -4,36 +4,36 @@ import { prisma } from '@/lib/prisma';
 
 export const maxDuration = 30;
 
-const BROWSERLESS_WSS = 'wss://production-sfo.browserless.io';
+const STEEL_API = 'https://api.steel.dev/v1';
 
-// Selectors that confirm the user is logged in for each site
-const LOGIN_SUCCESS_SELECTORS: Record<string, string[]> = {
-  indeed:    ['.icl-Avatar', '[data-testid="UserDropdownButton"]', '[href*="/account/view"]', 'a[href*="resume"]'],
-  meteojob:  ['.user-menu', '[href*="mon-compte"]', '[href*="deconnexion"]'],
-  hellowork: ['.user-avatar', '[href*="mon-profil"]', '[href*="deconnexion"]'],
-  monster:   ['.account-nav', '[data-cy="user-menu"]', '[href*="logout"]'],
-  linkedin:  ['.global-nav__me', '[href*="/feed/"]', '.nav__button-secondary--profile'],
+// URL path fragments indicating successful login for each site
+const LOGIN_SUCCESS_URL_FRAGMENTS: Record<string, string[]> = {
+  indeed:    ['/account/view', '/myjobs', 'emplois.indeed.com', '/profil'],
+  meteojob:  ['/mon-compte', '/candidat', '/mes-offres'],
+  hellowork: ['/mon-profil', '/mes-candidatures', '/tableau-de-bord'],
+  monster:   ['/profil', '/mes-candidatures', '/dashboard'],
+  linkedin:  ['/feed', '/in/', '/mynetwork'],
 };
 
 /**
  * POST /api/external-accounts/capture-cookies
- * Connects to the Browserless session that is still open in the user's iframe,
- * checks whether the user is logged in, and if so captures and stores the cookies.
+ * Uses the Steel REST API to check the current URL of the live session
+ * and retrieve cookies. No Playwright / CDP needed.
  */
 export async function POST(req: NextRequest) {
   let userId: string;
   try { userId = requireAuth(req); } catch { return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }); }
 
-  const body = await req.json() as { site?: string };
-  const { site } = body;
+  const body = await req.json() as { site?: string; sessionId?: string };
+  const { site, sessionId } = body;
 
-  if (!site) {
-    return NextResponse.json({ error: 'site est requis' }, { status: 400 });
+  if (!site || !sessionId) {
+    return NextResponse.json({ error: 'site et sessionId sont requis' }, { status: 400 });
   }
 
-  const apiKey = process.env.BROWSERLESS_API_KEY;
+  const apiKey = process.env.STEEL_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ success: false, message: 'Service de navigation cloud non configuré' });
+    return NextResponse.json({ success: false, message: 'Service de navigation non configuré' });
   }
 
   const account = await prisma.externalAccount.findFirst({ where: { userId, site } });
@@ -42,43 +42,53 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { chromium } = await import('playwright-core');
+    // --- 1. Get session info (current URL) ---
+    const sessionRes = await fetch(`${STEEL_API}/sessions/${sessionId}`, {
+      headers: { 'Steel-Api-Key': apiKey },
+    });
 
-    // Connect to the already-running Browserless session
-    const browser = await chromium.connectOverCDP(`${BROWSERLESS_WSS}?token=${apiKey}`);
-
-    const contexts = browser.contexts();
-    if (contexts.length === 0) {
-      await browser.close();
+    if (!sessionRes.ok) {
       return NextResponse.json({
         success: false,
-        message: 'Session expirée. Cliquez sur "Créer une session" pour recommencer.',
+        message: 'Session expirée ou introuvable. Recommencez la connexion.',
       });
     }
 
-    const context = contexts[0];
-    const pages = context.pages();
-    const page = pages[pages.length - 1];
+    const sessionData = await sessionRes.json() as { current_url?: string; status?: string };
+    const currentUrl = sessionData.current_url ?? '';
+    console.log(`[capture-cookies] URL actuelle (${site}): ${currentUrl}`);
 
-    // Check login success selectors
-    const selectors = LOGIN_SUCCESS_SELECTORS[site] ?? ['[href*="logout"]', '[href*="deconnexion"]'];
-    let isLoggedIn = false;
-    for (const selector of selectors) {
-      const el = await page.$(selector).catch(() => null);
-      if (el) { isLoggedIn = true; break; }
-    }
+    // --- 2. Verify login by checking current URL ---
+    const successFragments = LOGIN_SUCCESS_URL_FRAGMENTS[site] ?? [];
+    const loginPageFragments = ['login', 'connexion', 'signin', 'sign-in', 'authenticate'];
+
+    const isOnLoginPage = loginPageFragments.some(f => currentUrl.toLowerCase().includes(f));
+    const hasSuccessUrl = successFragments.some(f => currentUrl.includes(f));
+    const isLoggedIn = hasSuccessUrl || (!isOnLoginPage && currentUrl !== '');
 
     if (!isLoggedIn) {
-      await browser.close();
       return NextResponse.json({
         success: false,
-        message: 'Connexion non détectée. Assurez-vous d\'être bien connecté dans la fenêtre, puis cliquez "J\'ai fini".',
+        message: 'Connexion non détectée. Finissez de vous connecter dans la fenêtre puis cliquez à nouveau sur "J\'ai fini".',
       });
     }
 
-    const cookies = await context.cookies();
-    await browser.close();
+    // --- 3. Retrieve cookies via Steel REST API ---
+    const cookiesRes = await fetch(`${STEEL_API}/sessions/${sessionId}/cookies`, {
+      headers: { 'Steel-Api-Key': apiKey },
+    });
 
+    const cookiesData = await cookiesRes.json() as { cookies?: unknown[] };
+    const cookies = cookiesData.cookies ?? [];
+    console.log(`[capture-cookies] ${cookies.length} cookies récupérés pour ${site}`);
+
+    // --- 4. Release the Steel session (stop billing) ---
+    await fetch(`${STEEL_API}/sessions/${sessionId}/release`, {
+      method: 'POST',
+      headers: { 'Steel-Api-Key': apiKey },
+    }).catch(() => { /* non-critical */ });
+
+    // --- 5. Persist cookies ---
     await prisma.externalAccount.update({
       where: { id: account.id },
       data: {
@@ -88,8 +98,6 @@ export async function POST(req: NextRequest) {
         lastTestedAt: new Date(),
       },
     });
-
-    console.log(`[capture-cookies] ${cookies.length} cookies sauvegardés pour ${site} / user ${userId}`);
 
     return NextResponse.json({
       success: true,
@@ -101,7 +109,7 @@ export async function POST(req: NextRequest) {
     console.error('[capture-cookies] Erreur:', msg);
     return NextResponse.json({
       success: false,
-      message: 'Erreur lors de la capture de session. Réessayez.',
+      message: 'Erreur technique. Réessayez.',
     });
   }
 }

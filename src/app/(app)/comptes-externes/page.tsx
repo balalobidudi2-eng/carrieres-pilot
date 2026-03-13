@@ -58,6 +58,7 @@ export default function ExternalAccountsPage() {
   const [password, setPassword] = useState('');
   const [customLoginUrl, setCustomLoginUrl] = useState('');
   const [sessionUrl, setSessionUrl] = useState('');
+  const [sessionId, setSessionId] = useState('');
 
   // Feedback
   const [busy, setBusy] = useState(false);
@@ -88,6 +89,7 @@ export default function ExternalAccountsPage() {
     setPassword('');
     setCustomLoginUrl('');
     setSessionUrl('');
+    setSessionId('');
     setStatusMsg(null);
   }
 
@@ -116,15 +118,16 @@ export default function ExternalAccountsPage() {
     }
   }
 
-  // ── Open Browserless session (OTP sites) ─────────────────────────────────
+  // ── Open Steel.dev session (OTP sites) ──────────────────────────────────
 
   async function handleStartSession() {
     if (!selectedSite) return;
     setBusy(true);
     setStatusMsg({ type: 'info', text: 'Préparation de la fenêtre de connexion…' });
     try {
-      const res = await api.post<{ sessionUrl: string }>('/external-accounts/start-session', { site: selectedSite.id, email });
+      const res = await api.post<{ sessionUrl: string; sessionId: string }>('/external-accounts/start-session', { site: selectedSite.id, email });
       setSessionUrl(res.data.sessionUrl);
+      setSessionId(res.data.sessionId);
       setStatusMsg(null);
       setStep('browser-session');
     } catch (e: unknown) {
@@ -143,7 +146,7 @@ export default function ExternalAccountsPage() {
     setStep('confirming');
     setStatusMsg({ type: 'info', text: 'Vérification de votre connexion…' });
     try {
-      const res = await api.post<{ success: boolean; message: string }>('/external-accounts/capture-cookies', { site: selectedSite.id });
+      const res = await api.post<{ success: boolean; message: string }>('/external-accounts/capture-cookies', { site: selectedSite.id, sessionId });
       if (res.data.success) {
         setStatusMsg({ type: 'success', text: res.data.message });
         await loadAccounts();
@@ -444,7 +447,7 @@ export default function ExternalAccountsPage() {
         </div>
       )}
 
-      {/* ── BROWSER SESSION (iframe Browserless) ─────────────────────────── */}
+      {/* ── BROWSER SESSION (iframe Steel.dev) ───────────────────────────── */}
       {step === 'browser-session' && selectedSite && sessionUrl && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
