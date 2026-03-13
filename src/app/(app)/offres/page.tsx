@@ -67,14 +67,22 @@ function OffresPageContent() {
 
   const triggerSearch = () => {
     setHasSearched(true);
+    setTab('all'); // IMPORTANT: les recherches explicites utilisent toujours /offers (pas /offers/recommended) pour respecter le paramètre source
     setCommitted({ query, contracts, sectors, distance, locationMode, customLocation, apiSource });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[FRONTEND] triggerSearch → source:', apiSource, '| query:', query);
+    }
   };
 
   // Quand l'admin change la source API, re-lancer la recherche immédiatement si déjà recherché
   const handleSourceChange = (newSource: 'france_travail' | 'adzuna' | 'both') => {
     setApiSource(newSource);
     if (hasSearched) {
+      setTab('all'); // basculer sur l'onglet 'all' pour que source soit respecté
       setCommitted((prev) => ({ ...prev, apiSource: newSource }));
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[FRONTEND] handleSourceChange → newSource:', newSource, '| hasSearched:', hasSearched);
     }
   };
 

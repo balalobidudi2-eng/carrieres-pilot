@@ -29,6 +29,9 @@ export async function GET(req: NextRequest) {
   // Source choisie par l'admin via l'UI (restreinte côté frontend à ghilesaimeur951@gmail.com)
   const source = searchParams.get('source'); // 'adzuna' | 'france_travail' | 'both' | null
 
+  // LOG PERMANENT — ne pas supprimer — utile pour diagnostics
+  console.log(`[API /offers] source="${source}" | q="${q ?? ''}" | ts=${new Date().toISOString()}`);
+
   const contractMap: Record<string, string> = {
     CDI: 'CDI', CDD: 'CDD', Stage: 'SAI', Alternance: 'MIS', Freelance: 'LIB',
   };
