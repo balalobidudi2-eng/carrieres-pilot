@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { api, setAccessToken } from '@/lib/axios';
 import type { User } from '@/types';
 import toast from 'react-hot-toast';
@@ -16,10 +17,12 @@ interface AuthState {
   updateUser: (updates: Partial<User>) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isLoading: false,
-  isInitialized: false,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isLoading: false,
+      isInitialized: false,
 
   login: async (email, password) => {
     set({ isLoading: true });
@@ -107,4 +110,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   updateUser: (updates) =>
     set((state) => ({ user: state.user ? { ...state.user, ...updates } : null })),
-}));
+  }),
+  {
+    name: 'cp-auth',
+    partialize: (state) => ({ user: state.user }),
+  }
+));

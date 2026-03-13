@@ -43,3 +43,6 @@ yarn-error.log*
 /src/generated/prisma
 
 .env*.local
+
+# Dev server log
+dev-server.log
