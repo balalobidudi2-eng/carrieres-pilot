@@ -7,7 +7,7 @@ export const maxDuration = 15;
 
 const SITE_CONFIG: Record<string, { label: string; loginUrl: string }> = {
   indeed:    { label: 'Indeed',    loginUrl: 'https://fr.indeed.com/account/login' },
-  meteojob:  { label: 'Météo Job', loginUrl: 'https://candidat.meteojob.com' },
+  meteojob:  { label: 'Météo Job', loginUrl: 'https://www.meteojob.com/candidate/signin' },
   hellowork: { label: 'HelloWork', loginUrl: 'https://www.hellowork.com/fr-fr/connexion.html' },
   monster:   { label: 'Monster',   loginUrl: 'https://www.monster.fr/connexion' },
   linkedin:  { label: 'LinkedIn',  loginUrl: 'https://www.linkedin.com/login' },

@@ -14,7 +14,7 @@ import { BrowserViewer } from '@/components/BrowserViewer';
 const SUPPORTED_SITES = [
   { id: 'indeed',    label: 'Indeed',     emoji: '🔵', authType: 'otp' as const,      loginUrl: 'https://fr.indeed.com/account/login' },
   { id: 'hellowork', label: 'HelloWork',  emoji: '👋', authType: 'otp' as const,      loginUrl: 'https://www.hellowork.com/fr-fr/connexion.html' },
-  { id: 'meteojob',  label: 'Météo Job',  emoji: '☀️', authType: 'password' as const, loginUrl: 'https://candidat.meteojob.com' },
+  { id: 'meteojob',  label: 'Météo Job',  emoji: '☀️', authType: 'password' as const, loginUrl: 'https://www.meteojob.com/candidate/signin' },
   { id: 'monster',   label: 'Monster',    emoji: '👾', authType: 'password' as const, loginUrl: 'https://www.monster.fr/connexion' },
   { id: 'linkedin',  label: 'LinkedIn',   emoji: '💼', authType: 'password' as const, loginUrl: 'https://www.linkedin.com/login' },
   { id: 'custom',    label: 'Autre site', emoji: '🌐', authType: 'password' as const, loginUrl: '' },
