@@ -247,3 +247,125 @@ export function detectSiteFromUrl(offerUrl: string): string {
   if (url.includes('linkedin')) return 'linkedin';
   return 'custom';
 }
+
+export interface ApplySessionResult {
+  success: boolean;
+  message: string;
+  /** true when the session is expired and the user must re-authenticate */
+  requiresManual?: boolean;
+}
+
+/**
+ * Open a job offer page using a saved cookie session (OTP sites) and attempt
+ * to fill + submit the application form automatically.
+ */
+export async function applyWithSession(
+  offerUrl: string,
+  cookiesJson: string,
+  userData: { firstName: string; lastName: string; email: string }
+): Promise<ApplySessionResult> {
+  let browser: Browser | null = null;
+
+  try {
+    browser = await launchBrowser();
+
+    const context = await browser.newContext({
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    });
+
+    // Inject saved session cookies
+    const cookies = JSON.parse(cookiesJson) as Parameters<BrowserContext['addCookies']>[0];
+    await context.addCookies(cookies);
+
+    const page = await context.newPage();
+    await page.goto(offerUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+
+    const currentUrl = page.url();
+    const isLoginPage =
+      currentUrl.includes('login') ||
+      currentUrl.includes('connexion') ||
+      currentUrl.includes('signin');
+
+    if (isLoginPage) {
+      await browser.close();
+      return {
+        success: false,
+        requiresManual: true,
+        message: 'Session expirée. Reconnectez-vous dans "Mes comptes externes" → Renouveler.',
+      };
+    }
+
+    // Find and click the apply button
+    const APPLY_SELECTORS = [
+      'button:has-text("Postuler")',
+      'button:has-text("Postuler maintenant")',
+      '[data-testid="applyButton"]',
+      '.jobsearch-IndeedApplyButton',
+      'a:has-text("Postuler")',
+    ];
+
+    let applyBtn = null;
+    for (const sel of APPLY_SELECTORS) {
+      applyBtn = await page.$(sel).catch(() => null);
+      if (applyBtn) break;
+    }
+
+    if (!applyBtn) {
+      await browser.close();
+      return {
+        success: false,
+        requiresManual: true,
+        message: 'Bouton de candidature introuvable. Candidature manuelle requise.',
+      };
+    }
+
+    await Promise.all([
+      page.waitForNavigation({ timeout: 8000, waitUntil: 'domcontentloaded' }).catch(() => null),
+      applyBtn.click(),
+    ]);
+    await page.waitForTimeout(2000);
+
+    // Fill common form fields
+    const nameField = await page.$('input[name="name"], input[placeholder*="nom"]').catch(() => null);
+    if (nameField) await nameField.fill(`${userData.firstName} ${userData.lastName}`);
+
+    const emailField = await page.$('input[type="email"]').catch(() => null);
+    if (emailField) await emailField.fill(userData.email);
+
+    // Attempt submit
+    const submitSelectors = [
+      'button[type="submit"]:has-text("Envoyer")',
+      'button:has-text("Envoyer ma candidature")',
+      'button:has-text("Soumettre")',
+      'button[type="submit"]',
+    ];
+
+    let submitted = false;
+    for (const sel of submitSelectors) {
+      const btn = await page.$(sel).catch(() => null);
+      if (btn) {
+        await btn.click();
+        await page.waitForTimeout(2000);
+        submitted = true;
+        break;
+      }
+    }
+
+    await browser.close();
+
+    if (submitted) {
+      return { success: true, message: 'Candidature envoyée avec succès ✅' };
+    }
+
+    return {
+      success: false,
+      requiresManual: true,
+      message: "Le formulaire n'a pas pu être soumis automatiquement. Candidature manuelle requise.",
+    };
+  } catch (e: unknown) {
+    await browser?.close();
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, message: `Erreur Playwright : ${msg}` };
+  }
+}

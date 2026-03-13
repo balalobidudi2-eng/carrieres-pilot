@@ -22,6 +22,14 @@ export async function POST(
     return NextResponse.json({ error: 'Compte introuvable' }, { status: 404 });
   }
 
+  // OTP accounts (Indeed, HelloWork) have no password — test not applicable
+  if (!account.passwordHash) {
+    return NextResponse.json({
+      success: false,
+      message: 'Ce site utilise OTP (pas de mot de passe). La session est gérée via cookies — utilisez "Renouveler" si elle a expiré.',
+    });
+  }
+
   let password: string;
   try {
     password = decrypt(account.passwordHash);

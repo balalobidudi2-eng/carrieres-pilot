@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
       email: true,
       isValid: true,
       lastTestedAt: true,
+      lastLoginAt: true,
       createdAt: true,
       // passwordHash and cookiesJson are NEVER sent to the frontend
     },
@@ -42,8 +43,16 @@ export async function POST(req: NextRequest) {
 
   const { site, siteLabel, loginUrl, email, password } = body;
 
-  if (!site || !email || !password || !loginUrl) {
-    return NextResponse.json({ error: 'Champs manquants : site, email, password et loginUrl sont requis' }, { status: 400 });
+  // Sites that use OTP (no password field) — derived from known site list
+  const OTP_SITES = new Set(['indeed', 'hellowork']);
+  const isOtpSite = OTP_SITES.has(site ?? '');
+
+  if (!site || !email || !loginUrl) {
+    return NextResponse.json({ error: 'Champs manquants : site, email et loginUrl sont requis' }, { status: 400 });
+  }
+
+  if (!isOtpSite && !password) {
+    return NextResponse.json({ error: 'Mot de passe requis pour ce site' }, { status: 400 });
   }
 
   // Email basic validation
@@ -51,12 +60,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email invalide' }, { status: 400 });
   }
 
-  if (password.length < 6) {
+  if (!isOtpSite && password && password.length < 6) {
     return NextResponse.json({ error: 'Mot de passe trop court' }, { status: 400 });
   }
 
-  // Encrypt password before storage — never store plaintext
-  const passwordHash = encrypt(password);
+  // Encrypt password before storage (OTP sites store empty string)
+  const passwordHash = isOtpSite ? '' : encrypt(password!);
 
   const account = await prisma.externalAccount.upsert({
     where: { userId_site: { userId, site } },
