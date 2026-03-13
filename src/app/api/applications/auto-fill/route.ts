@@ -4,6 +4,8 @@ import { autoFillApplicationForm, type FormFillRequest } from '@/lib/form-automa
 import { checkQuota, incrementUsage, getUserPlan } from '@/lib/quota-service';
 import { PLANS } from '@/lib/plans';
 import { prisma } from '@/lib/prisma';
+import { decrypt } from '@/lib/encryption';
+import { detectSiteFromUrl, testExternalLogin, loginWithCookies } from '@/lib/playwright-login';
 
 /** POST /api/applications/auto-fill — auto-fill an online application form */
 export async function POST(req: NextRequest) {
@@ -44,6 +46,72 @@ export async function POST(req: NextRequest) {
   if (!body.applicationUrl) {
     return NextResponse.json({ error: 'applicationUrl est requis' }, { status: 400 });
   }
+
+  // ─── Auto-login with stored external credentials ───────────────────────────
+  // Only for Playwright mode — SMTP doesn't need a pre-authenticated session
+  if (applyMode !== 'smtp') {
+    const site = detectSiteFromUrl(body.applicationUrl);
+    const externalAccount = await prisma.externalAccount.findFirst({
+      where: { userId, site },
+    }).catch(() => null);
+
+    if (externalAccount) {
+      // Try to reuse saved cookies first (faster, avoids re-login)
+      let sessionReused = false;
+      if (externalAccount.cookiesJson) {
+        const session = await loginWithCookies(body.applicationUrl, externalAccount.cookiesJson);
+        if (session) {
+          await session.browser.close();
+          sessionReused = true;
+          console.log(`[auto-fill] Session cookies reused for ${site}`);
+        }
+      }
+
+      // If cookies are expired or missing, perform a fresh login
+      if (!sessionReused) {
+        let password: string;
+        try {
+          password = decrypt(externalAccount.passwordHash);
+        } catch {
+          console.warn('[auto-fill] Could not decrypt external account password — continuing without pre-login');
+          password = '';
+        }
+
+        if (password) {
+          const loginResult = await testExternalLogin({
+            loginUrl: externalAccount.loginUrl,
+            email: externalAccount.email,
+            password,
+            site,
+          });
+
+          if (loginResult.success) {
+            // Persist refreshed cookies for next request
+            await prisma.externalAccount.update({
+              where: { id: externalAccount.id },
+              data: {
+                cookiesJson: loginResult.cookies ? JSON.stringify(loginResult.cookies) : null,
+                isValid: true,
+                lastLoginAt: new Date(),
+              },
+            }).catch(() => null);
+            console.log(`[auto-fill] Fresh login succeeded for ${site}`);
+          } else {
+            // Non-fatal: return a clear message so user can update credentials
+            return NextResponse.json({
+              success: false,
+              requiresManual: false,
+              message: `Connexion automatique échouée sur ${externalAccount.siteLabel} : ${loginResult.message}. Vérifiez vos identifiants dans "Comptes externes".`,
+              settingsUrl: '/comptes-externes',
+            }, { status: 200 });
+          }
+        }
+      }
+    }
+    // No external account for this site — proceed normally (Playwright will try
+    // as a guest; many sites allow browsing without login)
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // Use values from request body, fall back to the authenticated user's profile in DB
   let firstName = body.firstName?.trim() || '';

@@ -20,6 +20,7 @@ import {
   LogOut,
   Shield,
   Bell,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
@@ -51,6 +52,7 @@ const navGroups = [
     items: [
       { href: '/profil', icon: User, label: 'Profil' },
       { href: '/abonnement', icon: CreditCard, label: 'Abonnement' },
+      { href: '/comptes-externes', icon: KeyRound, label: 'Comptes externes' },
       { href: '/parametres', icon: Settings, label: 'Paramètres' },
     ],
   },
