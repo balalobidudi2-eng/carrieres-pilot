@@ -21,7 +21,6 @@ import {
   Search,
   ArrowRight,
   Sparkles,
-  Bell,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -60,9 +59,6 @@ export default function DashboardPage() {
     queryKey: ['recommended-offers'],
     queryFn: () => api.get('/offers/recommended').then((r) => r.data as { id: string; title: string; company: string; location: string; matchScore?: number; url?: string }[]),
   });
-
-  // Nouvelles offres du jour — cap strict à 20, basé sur les offres recommandées
-  const dailyOfferCount = Math.min(recommended.length, 20);
 
   const statCards = [
     {
@@ -143,28 +139,6 @@ export default function DashboardPage() {
               );
             })}
       </motion.div>
-
-      {/* ── Daily Job Offer Banner ───────────────────────────────────────── */}
-      {dailyOfferCount > 0 && (
-        <motion.div variants={fadeInUp} className="bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/30 rounded-card px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center shrink-0">
-              <Bell size={16} className="text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-[#1E293B]">
-                {dailyOfferCount} nouvelle{dailyOfferCount > 1 ? 's' : ''} offre{dailyOfferCount > 1 ? 's' : ''} correspondent à votre profil aujourd&apos;hui
-              </p>
-              <p className="text-xs text-[#64748B]">Basé sur vos compétences et préférences — mis à jour chaque jour (max 20)</p>
-            </div>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Link href="/offres?tab=recommended" className="flex items-center gap-1.5 px-4 py-2 rounded-btn border border-accent text-accent text-sm font-semibold hover:bg-accent hover:text-white transition-all">
-              Voir les offres <ArrowRight size={13} />
-            </Link>
-          </div>
-        </motion.div>
-      )}
 
       {/* Chart + quick actions */}
       <motion.div variants={fadeInUp} className="grid lg:grid-cols-7 gap-4">
