@@ -4,10 +4,8 @@ import { prisma } from '@/lib/prisma';
 
 export const maxDuration = 30;
 
-const STEEL_API = 'https://api.steel.dev/v1';
-
-// URL path fragments indicating successful login for each site
-const LOGIN_SUCCESS_URL_FRAGMENTS: Record<string, string[]> = {
+// Fragments d'URL indiquant une connexion réussie pour chaque site
+const LOGIN_SUCCESS_FRAGMENTS: Record<string, string[]> = {
   indeed:    ['/account/view', '/myjobs', 'emplois.indeed.com', '/profil'],
   meteojob:  ['/mon-compte', '/candidat', '/mes-offres'],
   hellowork: ['/mon-profil', '/mes-candidatures', '/tableau-de-bord'],
@@ -15,10 +13,12 @@ const LOGIN_SUCCESS_URL_FRAGMENTS: Record<string, string[]> = {
   linkedin:  ['/feed', '/in/', '/mynetwork'],
 };
 
+const LOGIN_PAGE_FRAGMENTS = ['login', 'connexion', 'signin', 'sign-in', 'authenticate'];
+
 /**
  * POST /api/external-accounts/capture-cookies
- * Uses the Steel REST API to check the current URL of the live session
- * and retrieve cookies. No Playwright / CDP needed.
+ * Appelle le microservice automation pour récupérer les cookies
+ * du navigateur Playwright après que l'utilisateur s'est connecté.
  */
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -31,9 +31,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'site et sessionId sont requis' }, { status: 400 });
   }
 
-  const apiKey = process.env.STEEL_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ success: false, message: 'Service de navigation non configuré' });
+  const automationUrl = process.env.AUTOMATION_SERVICE_URL;
+  const automationSecret = process.env.AUTOMATION_SECRET;
+
+  if (!automationUrl || !automationSecret) {
+    return NextResponse.json({ success: false, message: 'Service d\'automatisation non configuré' });
   }
 
   const account = await prisma.externalAccount.findFirst({ where: { userId, site } });
@@ -42,29 +44,29 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // --- 1. Get session info (current URL) ---
-    const sessionRes = await fetch(`${STEEL_API}/sessions/${sessionId}`, {
-      headers: { 'Steel-Api-Key': apiKey },
+    // --- 1. Récupérer cookies + URL courante depuis le microservice ---
+    const cookiesRes = await fetch(`${automationUrl}/sessions/${sessionId}/cookies`, {
+      method: 'POST',
+      headers: { 'x-automation-secret': automationSecret },
     });
 
-    if (!sessionRes.ok) {
+    if (!cookiesRes.ok) {
+      const errText = await cookiesRes.text();
+      console.error('[capture-cookies] Microservice error:', cookiesRes.status, errText);
       return NextResponse.json({
         success: false,
         message: 'Session expirée ou introuvable. Recommencez la connexion.',
       });
     }
 
-    const sessionData = await sessionRes.json() as { current_url?: string; status?: string };
-    const currentUrl = sessionData.current_url ?? '';
-    console.log(`[capture-cookies] URL actuelle (${site}): ${currentUrl}`);
+    const { cookies, currentUrl } = await cookiesRes.json() as { cookies: unknown[]; currentUrl: string };
+    console.log(`[capture-cookies] URL: ${currentUrl} | ${cookies.length} cookies`);
 
-    // --- 2. Verify login by checking current URL ---
-    const successFragments = LOGIN_SUCCESS_URL_FRAGMENTS[site] ?? [];
-    const loginPageFragments = ['login', 'connexion', 'signin', 'sign-in', 'authenticate'];
-
-    const isOnLoginPage = loginPageFragments.some(f => currentUrl.toLowerCase().includes(f));
+    // --- 2. Vérifier la connexion via l'URL courante ---
+    const successFragments = LOGIN_SUCCESS_FRAGMENTS[site] ?? [];
+    const isOnLoginPage = LOGIN_PAGE_FRAGMENTS.some(f => currentUrl.toLowerCase().includes(f));
     const hasSuccessUrl = successFragments.some(f => currentUrl.includes(f));
-    const isLoggedIn = hasSuccessUrl || (!isOnLoginPage && currentUrl !== '');
+    const isLoggedIn = hasSuccessUrl || (!isOnLoginPage && currentUrl.length > 0);
 
     if (!isLoggedIn) {
       return NextResponse.json({
@@ -73,22 +75,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // --- 3. Retrieve cookies via Steel REST API ---
-    const cookiesRes = await fetch(`${STEEL_API}/sessions/${sessionId}/cookies`, {
-      headers: { 'Steel-Api-Key': apiKey },
-    });
+    // --- 3. Fermer la session navigateur (libérer les ressources Railway) ---
+    await fetch(`${automationUrl}/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: { 'x-automation-secret': automationSecret },
+    }).catch(() => { /* non-critique */ });
 
-    const cookiesData = await cookiesRes.json() as { cookies?: unknown[] };
-    const cookies = cookiesData.cookies ?? [];
-    console.log(`[capture-cookies] ${cookies.length} cookies récupérés pour ${site}`);
-
-    // --- 4. Release the Steel session (stop billing) ---
-    await fetch(`${STEEL_API}/sessions/${sessionId}/release`, {
-      method: 'POST',
-      headers: { 'Steel-Api-Key': apiKey },
-    }).catch(() => { /* non-critical */ });
-
-    // --- 5. Persist cookies ---
+    // --- 4. Sauvegarder les cookies en base ---
     await prisma.externalAccount.update({
       where: { id: account.id },
       data: {
@@ -107,9 +100,6 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[capture-cookies] Erreur:', msg);
-    return NextResponse.json({
-      success: false,
-      message: 'Erreur technique. Réessayez.',
-    });
+    return NextResponse.json({ success: false, message: 'Erreur technique. Réessayez.' });
   }
 }

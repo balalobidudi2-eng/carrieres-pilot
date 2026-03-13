@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { randomUUID } from 'crypto';
 
 export const maxDuration = 15;
-
-const STEEL_API = 'https://api.steel.dev/v1';
 
 const SITE_CONFIG: Record<string, { label: string; loginUrl: string }> = {
   indeed:    { label: 'Indeed',    loginUrl: 'https://fr.indeed.com/account/login' },
@@ -16,9 +15,8 @@ const SITE_CONFIG: Record<string, { label: string; loginUrl: string }> = {
 
 /**
  * POST /api/external-accounts/start-session
- * Creates an interactive Steel.dev browser session and returns:
- *   - sessionUrl: the viewer URL to embed in an iframe (CORS-safe, designed for embedding)
- *   - sessionId: used by capture-cookies to retrieve cookies after login
+ * Crée une session navigateur sur le microservice automation (Railway).
+ * Retourne sessionId + wsUrl pour le stream WebSocket canvas côté client.
  */
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -36,35 +34,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Site "${site}" non supporté` }, { status: 400 });
   }
 
-  const apiKey = process.env.STEEL_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'Service de navigation non configuré (STEEL_API_KEY manquante)' }, { status: 503 });
+  const automationUrl = process.env.AUTOMATION_SERVICE_URL;
+  const automationSecret = process.env.AUTOMATION_SECRET;
+
+  if (!automationUrl || !automationSecret) {
+    return NextResponse.json({ error: 'Service d\'automatisation non configuré' }, { status: 503 });
   }
 
-  // Create an interactive Steel session — viewer_url is an iframe-safe URL
-  const sessionRes = await fetch(`${STEEL_API}/sessions`, {
+  const sessionId = randomUUID();
+
+  // Créer la session navigateur sur le microservice Railway
+  const sessionRes = await fetch(`${automationUrl}/sessions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Steel-Api-Key': apiKey },
-    body: JSON.stringify({
-      timeout: 120000,       // 2 min for the user to log in
-      is_interactive: true,  // user controls the browser via the iframe
-      initial_url: config.loginUrl,
-    }),
+    headers: { 'Content-Type': 'application/json', 'x-automation-secret': automationSecret },
+    body: JSON.stringify({ sessionId, initialUrl: config.loginUrl }),
   });
 
   if (!sessionRes.ok) {
     const err = await sessionRes.text();
-    console.error('[start-session] Steel error:', sessionRes.status, err);
+    console.error('[start-session] Automation error:', sessionRes.status, err);
     return NextResponse.json({ error: 'Impossible de créer la session de navigation' }, { status: 502 });
   }
 
-  const session = await sessionRes.json() as { id: string; sessionViewerUrl: string };
-  console.log(`[start-session] Steel session créée: ${session.id} pour ${site}`);
+  console.log(`[start-session] Session créée: ${sessionId} pour ${site}`);
 
-  // Save account row + pending session id (cookiesJson = temp storage)
+  // Sauvegarder l'email et l'ID de session en base
   await prisma.externalAccount.upsert({
     where: { userId_site: { userId, site } },
-    update: { email, isValid: false, cookiesJson: JSON.stringify({ pendingSessionId: session.id }) },
+    update: { email, isValid: false, cookiesJson: JSON.stringify({ pendingSessionId: sessionId }) },
     create: {
       userId,
       site,
@@ -73,9 +70,12 @@ export async function POST(req: NextRequest) {
       email,
       passwordHash: '',
       isValid: false,
-      cookiesJson: JSON.stringify({ pendingSessionId: session.id }),
+      cookiesJson: JSON.stringify({ pendingSessionId: sessionId }),
     },
   });
 
-  return NextResponse.json({ sessionUrl: session.sessionViewerUrl, sessionId: session.id });
+  // URL WebSocket pour le stream vidéo (utilisée par le composant BrowserViewer)
+  const wsUrl = `${automationUrl.replace('https://', 'wss://').replace('http://', 'ws://')}/stream?sessionId=${sessionId}&secret=${automationSecret}`;
+
+  return NextResponse.json({ sessionId, wsUrl });
 }

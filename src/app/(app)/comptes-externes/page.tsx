@@ -7,6 +7,7 @@ import {
   AlertTriangle, Clock, ChevronLeft, Plus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { BrowserViewer } from '@/components/BrowserViewer';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export default function ExternalAccountsPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [customLoginUrl, setCustomLoginUrl] = useState('');
-  const [sessionUrl, setSessionUrl] = useState('');
+  const [wsUrl, setWsUrl] = useState('');
   const [sessionId, setSessionId] = useState('');
 
   // Feedback
@@ -88,7 +89,7 @@ export default function ExternalAccountsPage() {
     setEmail('');
     setPassword('');
     setCustomLoginUrl('');
-    setSessionUrl('');
+    setWsUrl('');
     setSessionId('');
     setStatusMsg(null);
   }
@@ -118,15 +119,15 @@ export default function ExternalAccountsPage() {
     }
   }
 
-  // ── Open Steel.dev session (OTP sites) ──────────────────────────────────
+  // ── Ouvrir session navigateur (sites OTP) ─────────────────────────────
 
   async function handleStartSession() {
     if (!selectedSite) return;
     setBusy(true);
-    setStatusMsg({ type: 'info', text: 'Préparation de la fenêtre de connexion…' });
+    setStatusMsg({ type: 'info', text: 'Démarrage du navigateur…' });
     try {
-      const res = await api.post<{ sessionUrl: string; sessionId: string }>('/external-accounts/start-session', { site: selectedSite.id, email });
-      setSessionUrl(res.data.sessionUrl);
+      const res = await api.post<{ sessionId: string; wsUrl: string }>('/external-accounts/start-session', { site: selectedSite.id, email });
+      setWsUrl(res.data.wsUrl);
       setSessionId(res.data.sessionId);
       setStatusMsg(null);
       setStep('browser-session');
@@ -447,35 +448,24 @@ export default function ExternalAccountsPage() {
         </div>
       )}
 
-      {/* ── BROWSER SESSION (iframe Steel.dev) ───────────────────────────── */}
-      {step === 'browser-session' && selectedSite && sessionUrl && (
+      {/* ── BROWSER SESSION (stream WebSocket canvas) ────────────────────── */}
+      {step === 'browser-session' && selectedSite && wsUrl && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{selectedSite.emoji}</span>
             <div>
               <h2 className="text-lg font-semibold text-white">Connectez-vous à {selectedSite.label}</h2>
               <p className="text-xs text-[#64748B]">
-                Entrez votre email, attendez le code OTP, saisissez-le et connectez-vous. Puis cliquez sur "J'ai fini".
+                Entrez votre email, attendez le code OTP, saisissez-le. Puis cliquez sur "J'ai fini".
               </p>
             </div>
           </div>
 
-          <div className="rounded-xl overflow-hidden border border-white/10" style={{ height: '520px' }}>
-            <iframe
-              src={sessionUrl}
-              className="w-full h-full"
-              title={`Connexion ${selectedSite.label}`}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-            />
-          </div>
-
-          <button
-            onClick={handleCaptureCookies}
-            disabled={busy}
-            className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 text-black font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            {busy ? <><Loader2 size={16} className="animate-spin" /> Vérification…</> : "✅ J'ai fini, je suis connecté"}
-          </button>
+          <BrowserViewer
+            wsUrl={wsUrl}
+            onConfirm={handleCaptureCookies}
+            loading={busy}
+          />
         </div>
       )}
 
