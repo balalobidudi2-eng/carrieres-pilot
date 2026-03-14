@@ -50,6 +50,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   const [photoShape, setPhotoShape] = useState<'circle' | 'square' | 'rounded'>((cv.content as any)?.personal?.photoShape ?? 'circle');
   const [photoSize, setPhotoSize] = useState<'small' | 'medium' | 'large'>((cv.content as any)?.personal?.photoSize ?? 'medium');
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit');
+  const [pdfLoading, setPdfLoading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const { register, watch, setValue, getValues, control } = useForm<CVContent>({
@@ -84,25 +85,30 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
     onError: (err: Error) => toast.error((err as any)?.response?.data?.error ?? err.message ?? 'Erreur génération IA'),
   });
 
-  const generatePDFMutation = useMutation({
-    mutationFn: async () => {
+  // Open popup BEFORE the async fetch so the browser doesn't block it as untrusted
+  const handleGeneratePDF = async () => {
+    const w = window.open('', '_blank');
+    if (!w) {
+      toast.error('Popup bloqué — autorisez les popups pour ce site puis réessayez');
+      return;
+    }
+    setPdfLoading(true);
+    try {
       const values = getValues();
       const withPhoto = { ...values, personal: { ...(values.personal ?? {}), photo, photoPosition, photoShape, photoSize } };
       const res = await api.post(`/cv/${cv.id}/generate-pdf`, { content: withPhoto }, { responseType: 'text' });
-      return res.data;
-    },
-    onSuccess: (html: string) => {
-      const w = window.open('', '_blank');
-      if (!w) { toast.error('Popup bloqué — autorisez les popups pour ce site puis réessayez'); return; }
-      w.document.write(html);
+      w.document.open();
+      w.document.write(res.data as string);
       w.document.close();
-      setTimeout(() => w.print(), 500);
-    },
-    onError: (err: unknown) => {
+      setTimeout(() => w.print(), 600);
+    } catch (err: unknown) {
+      w.close();
       const msg = (err as any)?.response?.data?.error ?? 'Erreur export PDF';
       toast.error(msg);
-    },
-  });
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   const handleSave = () => {
     setAutoSaveStatus('saving');
@@ -148,7 +154,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] max-w-[1200px]">
       {/* Mobile tabs */}
-      <div className="flex xl:hidden border-b border-[#E2E8F0] mb-4 bg-white sticky top-0 z-10">
+      <div className="flex md:hidden border-b border-[#E2E8F0] mb-4 bg-white sticky top-0 z-20">
         <button
           onClick={() => setMobileView('edit')}
           className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${mobileView === 'edit' ? 'border-violet-500 text-violet-600' : 'border-transparent text-[#64748B]'}`}
@@ -166,7 +172,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
       {/* Content row */}
       <div className="flex flex-1 gap-6 min-h-0">
       {/* Left panel — form */}
-      <div className={`${mobileView === 'edit' ? 'flex-1 flex flex-col min-w-0' : 'hidden'} xl:flex xl:flex-1 xl:flex-col xl:min-w-0`}>
+      <div className={`${mobileView === 'edit' ? 'flex-1 flex flex-col min-w-0' : 'hidden'} md:flex md:flex-1 md:flex-col md:min-w-0`}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="font-heading text-xl font-bold text-[#1E293B]">{cv.name}</h2>
@@ -182,8 +188,8 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => generatePDFMutation.mutate()}
-              loading={generatePDFMutation.isPending}
+              onClick={handleGeneratePDF}
+              loading={pdfLoading}
             >
               <Download size={14} />
               PDF
@@ -488,7 +494,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
       </div>
 
       {/* Right panel — preview */}
-      <div className={`${mobileView === 'preview' ? 'flex w-full flex-col' : 'hidden'} xl:flex xl:w-[420px] xl:shrink-0 xl:flex-col`}>
+      <div className={`${mobileView === 'preview' ? 'flex w-full flex-col' : 'hidden'} md:flex md:w-[420px] md:shrink-0 md:flex-col`}>
         <div className="flex items-center justify-between mb-4">
           <p className="font-semibold text-sm text-[#1E293B]">Aperçu temps réel</p>
           {cv.atsScore !== undefined && (
@@ -507,7 +513,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
       {mobileView === 'edit' && (
         <button
           onClick={() => setMobileView('preview')}
-          className="fixed bottom-6 right-4 z-50 flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-4 py-3 rounded-full shadow-lg text-sm font-medium xl:hidden transition-all active:scale-95"
+          className="fixed bottom-6 right-4 z-50 flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-4 py-3 rounded-full shadow-lg text-sm font-medium md:hidden transition-all active:scale-95"
         >
           👁 Voir le CV
         </button>
@@ -515,7 +521,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
       {mobileView === 'preview' && (
         <button
           onClick={() => setMobileView('edit')}
-          className="fixed bottom-6 left-4 z-50 flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-full shadow-lg text-sm font-medium xl:hidden transition-all active:scale-95"
+          className="fixed bottom-6 left-4 z-50 flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-full shadow-lg text-sm font-medium md:hidden transition-all active:scale-95"
         >
           ← Éditer
         </button>

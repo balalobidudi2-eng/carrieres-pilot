@@ -67,6 +67,7 @@ export async function POST(
   if (!content) return NextResponse.json({ error: 'CV non trouvé' }, { status: 404 });
   try {
   const p = (content.personal ?? {}) as Record<string, string | undefined>;
+  console.log('[generate-pdf] cv.id:', params.id, '| bodyContent:', !!bodyContent, '| p.photo:', !!p.photo, '| photo length:', (p.photo ?? '').length);
 
   // Photo options
   const photoPosition = (p as any).photoPosition ?? 'top-left';
