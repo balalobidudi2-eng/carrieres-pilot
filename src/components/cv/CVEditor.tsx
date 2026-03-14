@@ -46,6 +46,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   const [openSections, setOpenSections] = useState<string[]>(['personal', 'summary']);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [photo, setPhoto] = useState<string | undefined>((cv.content as any)?.personal?.photo ?? undefined);
+  const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit');
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const { register, watch, setValue, getValues, control } = useForm<CVContent>({
@@ -82,7 +83,9 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
 
   const generatePDFMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.post(`/cv/${cv.id}/generate-pdf`, { content: getValues() }, { responseType: 'text' });
+      const values = getValues();
+      const withPhoto = { ...values, personal: { ...(values.personal ?? {}), photo } };
+      const res = await api.post(`/cv/${cv.id}/generate-pdf`, { content: withPhoto }, { responseType: 'text' });
       return res.data;
     },
     onSuccess: (html: string) => {
@@ -123,9 +126,27 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   };
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-80px)] max-w-[1200px]">
+    <div className="flex flex-col h-[calc(100vh-80px)] max-w-[1200px]">
+      {/* Mobile tabs */}
+      <div className="flex xl:hidden border-b border-[#E2E8F0] mb-4 bg-white sticky top-0 z-10">
+        <button
+          onClick={() => setMobileView('edit')}
+          className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${mobileView === 'edit' ? 'border-violet-500 text-violet-600' : 'border-transparent text-[#64748B]'}`}
+        >
+          ✏️ Éditer
+        </button>
+        <button
+          onClick={() => setMobileView('preview')}
+          className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors ${mobileView === 'preview' ? 'border-violet-500 text-violet-600' : 'border-transparent text-[#64748B]'}`}
+        >
+          👁 Aperçu
+        </button>
+      </div>
+
+      {/* Content row */}
+      <div className="flex flex-1 gap-6 min-h-0">
       {/* Left panel — form */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`${mobileView === 'edit' ? 'flex-1 flex flex-col min-w-0' : 'hidden'} xl:flex xl:flex-1 xl:flex-col xl:min-w-0`}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="font-heading text-xl font-bold text-[#1E293B]">{cv.name}</h2>
@@ -401,7 +422,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
       </div>
 
       {/* Right panel — preview */}
-      <div className="hidden xl:flex w-[420px] shrink-0 flex-col">
+      <div className={`${mobileView === 'preview' ? 'flex w-full flex-col' : 'hidden'} xl:flex xl:w-[420px] xl:shrink-0 xl:flex-col`}>
         <div className="flex items-center justify-between mb-4">
           <p className="font-semibold text-sm text-[#1E293B]">Aperçu temps réel</p>
           {cv.atsScore !== undefined && (
@@ -412,9 +433,27 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
           )}
         </div>
         <div className="flex-1 bg-white rounded-card border border-[#E2E8F0] overflow-y-auto p-6" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
-          <CVPreview content={watch()} />
+          <CVPreview content={{ ...watch(), personal: { ...(watch('personal') ?? {}), photo } }} />
         </div>
       </div>
+      </div>
+
+      {mobileView === 'edit' && (
+        <button
+          onClick={() => setMobileView('preview')}
+          className="fixed bottom-6 right-4 z-50 flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white px-4 py-3 rounded-full shadow-lg text-sm font-medium xl:hidden transition-all active:scale-95"
+        >
+          👁 Voir le CV
+        </button>
+      )}
+      {mobileView === 'preview' && (
+        <button
+          onClick={() => setMobileView('edit')}
+          className="fixed bottom-6 left-4 z-50 flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-full shadow-lg text-sm font-medium xl:hidden transition-all active:scale-95"
+        >
+          ← Éditer
+        </button>
+      )}
     </div>
   );
 }

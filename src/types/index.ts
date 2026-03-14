@@ -112,6 +112,7 @@ export interface CVPersonal {
   phone?: string;
   city?: string;
   linkedin?: string;
+  photo?: string;
 }
 
 export interface CVContent {

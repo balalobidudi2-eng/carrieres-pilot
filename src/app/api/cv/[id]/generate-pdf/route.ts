@@ -106,12 +106,19 @@ export async function POST(
   .exp-date { color: #94A3B8; font-size: 9pt; }
   .skills-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .skill-tag { background: #EDE9FE; color: #7C3AED; padding: 2px 10px; border-radius: 12px; font-size: 9pt; font-weight: 600; }
+  .header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 4px; }
+  .photo { width: 70px; height: 70px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
 </style>
 </head>
 <body>
-  <h1>${esc(p.firstName)} ${esc(p.lastName)}</h1>
-  ${p.title ? '<div class="subtitle">' + esc(p.title) + '</div>' : ''}
-  <div class="contact">${[p.email, p.phone, p.city].filter(Boolean).map(esc).join(' &middot; ')}</div>
+  <div class="header">
+    ${p.photo ? '<img src="' + p.photo + '" alt="" class="photo" />' : ''}
+    <div>
+      <h1>${esc(p.firstName)} ${esc(p.lastName)}</h1>
+      ${p.title ? '<div class="subtitle">' + esc(p.title) + '</div>' : ''}
+      <div class="contact">${[p.email, p.phone, p.city].filter(Boolean).map(esc).join(' &middot; ')}</div>
+    </div>
+  </div>
   ${summary ? '<h2>Resume</h2><div class="summary">' + esc(summary) + '</div>' : ''}
   ${experiences.length > 0 ? '<h2>Experiences</h2>' + expHtml : ''}
   ${education.length > 0 ? '<h2>Formation</h2>' + eduHtml : ''}
