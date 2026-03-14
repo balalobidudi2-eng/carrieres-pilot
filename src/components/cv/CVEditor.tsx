@@ -116,9 +116,26 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { toast.error('Fichier non supporté — utilisez PNG, JPG ou WebP'); return; }
-    if (file.size > 2 * 1024 * 1024) { toast.error('Image trop grande — maximum 2 Mo'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image trop grande — maximum 5 Mo'); return; }
     const reader = new FileReader();
-    reader.onload = (ev) => setPhoto(ev.target?.result as string);
+    reader.onload = (ev) => {
+      const original = ev.target?.result as string;
+      // Resize to max 300×300 to keep base64 payload under ~150 KB
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 300;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { setPhoto(original); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setPhoto(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => setPhoto(original);
+      img.src = original;
+    };
     reader.readAsDataURL(file);
   };
 

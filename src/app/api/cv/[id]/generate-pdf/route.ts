@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 /** POST /api/cv/[id]/generate-pdf — generate printable HTML for a CV */
+export const maxDuration = 30;
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -46,7 +47,20 @@ export async function POST(
         else return NextResponse.json({ error: 'CV non trouve' }, { status: 404 });
       } else {
         cvName = cv.name;
-        content = cv.content as Record<string, unknown>;
+        // Prefer bodyContent: it carries the live editor state (unsaved photo, photo options).
+        // Fall back to DB content only if the editor sent nothing.
+        if (bodyContent) {
+          content = {
+            ...(cv.content as Record<string, unknown>),
+            ...bodyContent,
+            personal: {
+              ...(cv.content as any)?.personal,
+              ...(bodyContent as any)?.personal,
+            },
+          };
+        } else {
+          content = cv.content as Record<string, unknown>;
+        }
       }
     }
   }
