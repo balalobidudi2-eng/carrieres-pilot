@@ -113,6 +113,9 @@ export interface CVPersonal {
   city?: string;
   linkedin?: string;
   photo?: string;
+  photoPosition?: 'top-left' | 'top-right' | 'top-center';
+  photoShape?: 'circle' | 'square' | 'rounded';
+  photoSize?: 'small' | 'medium' | 'large';
 }
 
 export interface CVContent {

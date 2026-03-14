@@ -53,6 +53,17 @@ export async function POST(
   if (!content) return NextResponse.json({ error: 'CV non trouvé' }, { status: 404 });
   try {
   const p = (content.personal ?? {}) as Record<string, string | undefined>;
+
+  // Photo options
+  const photoPosition = (p as any).photoPosition ?? 'top-left';
+  const photoShape = (p as any).photoShape ?? 'circle';
+  const photoSize = (p as any).photoSize ?? 'medium';
+  const photoSizePx = ({ small: 50, medium: 70, large: 90 } as Record<string, number>)[photoSize] ?? 70;
+  const photoRadius = ({ circle: '50%', rounded: '8px', square: '0' } as Record<string, string>)[photoShape] ?? '50%';
+  const headerFlexExtra = photoPosition === 'top-center'
+    ? 'flex-direction:column;align-items:center;text-align:center;'
+    : photoPosition === 'top-right' ? 'flex-direction:row-reverse;' : '';
+
   const summary = content.summary as string | undefined;
   const experiences = (content.experiences ?? []) as Array<Record<string, unknown>>;
   const education = (content.education ?? []) as Array<Record<string, unknown>>;
@@ -106,8 +117,8 @@ export async function POST(
   .exp-date { color: #94A3B8; font-size: 9pt; }
   .skills-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .skill-tag { background: #EDE9FE; color: #7C3AED; padding: 2px 10px; border-radius: 12px; font-size: 9pt; font-weight: 600; }
-  .header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 4px; }
-  .photo { width: 70px; height: 70px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+  .header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 4px; ${headerFlexExtra} }
+  .photo { width: ${photoSizePx}px; height: ${photoSizePx}px; border-radius: ${photoRadius}; object-fit: cover; flex-shrink: 0; }
 </style>
 </head>
 <body>

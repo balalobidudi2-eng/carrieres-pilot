@@ -46,6 +46,9 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   const [openSections, setOpenSections] = useState<string[]>(['personal', 'summary']);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [photo, setPhoto] = useState<string | undefined>((cv.content as any)?.personal?.photo ?? undefined);
+  const [photoPosition, setPhotoPosition] = useState<'top-left' | 'top-right' | 'top-center'>((cv.content as any)?.personal?.photoPosition ?? 'top-left');
+  const [photoShape, setPhotoShape] = useState<'circle' | 'square' | 'rounded'>((cv.content as any)?.personal?.photoShape ?? 'circle');
+  const [photoSize, setPhotoSize] = useState<'small' | 'medium' | 'large'>((cv.content as any)?.personal?.photoSize ?? 'medium');
   const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit');
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -84,7 +87,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   const generatePDFMutation = useMutation({
     mutationFn: async () => {
       const values = getValues();
-      const withPhoto = { ...values, personal: { ...(values.personal ?? {}), photo } };
+      const withPhoto = { ...values, personal: { ...(values.personal ?? {}), photo, photoPosition, photoShape, photoSize } };
       const res = await api.post(`/cv/${cv.id}/generate-pdf`, { content: withPhoto }, { responseType: 'text' });
       return res.data;
     },
@@ -104,8 +107,8 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
   const handleSave = () => {
     setAutoSaveStatus('saving');
     const values = getValues();
-    // Inject photo into personal section before saving
-    const withPhoto = { ...values, personal: { ...(values.personal ?? {}), photo } };
+    // Inject photo + options into personal section before saving
+    const withPhoto = { ...values, personal: { ...(values.personal ?? {}), photo, photoPosition, photoShape, photoSize } };
     saveMutation.mutate(withPhoto as CVContent);
   };
 
@@ -224,6 +227,52 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
                     </button>
                   )}
                 </div>
+
+                {/* Photo options — visible uniquement si photo uploadée */}
+                {photo && (
+                  <div className="mt-4 space-y-3 p-3 bg-[#F7F8FC] rounded-xl border border-[#E2E8F0]">
+                    <p className="text-[10px] font-semibold text-[#475569] uppercase tracking-wide">Options de la photo</p>
+
+                    {/* Position */}
+                    <div>
+                      <p className="text-[10px] text-[#94A3B8] mb-1.5">Position</p>
+                      <div className="flex gap-1.5">
+                        {([['top-left', 'Gauche'], ['top-center', 'Centre'], ['top-right', 'Droite']] as const).map(([val, lbl]) => (
+                          <button key={val} type="button" onClick={() => setPhotoPosition(val)}
+                            className={`flex-1 py-1.5 text-[10px] rounded-lg border transition-colors ${
+                              photoPosition === val ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-[#E2E8F0] text-[#64748B] hover:border-[#CBD5E1]'
+                            }`}>{lbl}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Forme */}
+                    <div>
+                      <p className="text-[10px] text-[#94A3B8] mb-1.5">Forme</p>
+                      <div className="flex gap-1.5">
+                        {([['circle', '● Rond'], ['rounded', '▣ Arrondi'], ['square', '■ Carré']] as const).map(([val, lbl]) => (
+                          <button key={val} type="button" onClick={() => setPhotoShape(val)}
+                            className={`flex-1 py-1.5 text-[10px] rounded-lg border transition-colors ${
+                              photoShape === val ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-[#E2E8F0] text-[#64748B] hover:border-[#CBD5E1]'
+                            }`}>{lbl}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Taille */}
+                    <div>
+                      <p className="text-[10px] text-[#94A3B8] mb-1.5">Taille</p>
+                      <div className="flex gap-1.5">
+                        {([['small', 'Petit'], ['medium', 'Moyen'], ['large', 'Grand']] as const).map(([val, lbl]) => (
+                          <button key={val} type="button" onClick={() => setPhotoSize(val)}
+                            className={`flex-1 py-1.5 text-[10px] rounded-lg border transition-colors ${
+                              photoSize === val ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-[#E2E8F0] text-[#64748B] hover:border-[#CBD5E1]'
+                            }`}>{lbl}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -433,7 +482,7 @@ export function CVEditor({ cv, onClose, onSave }: CVEditorProps) {
           )}
         </div>
         <div className="flex-1 bg-white rounded-card border border-[#E2E8F0] overflow-y-auto p-6" style={{ boxShadow: '0 4px 32px rgba(15,52,96,0.08)' }}>
-          <CVPreview content={{ ...watch(), personal: { ...(watch('personal') ?? {}), photo } }} />
+          <CVPreview content={{ ...watch(), personal: { ...(watch('personal') ?? {}), photo, photoPosition, photoShape, photoSize } }} />
         </div>
       </div>
       </div>
@@ -491,15 +540,27 @@ function Section({
 
 function CVPreview({ content }: { content: CVContent }) {
   const p = content.personal;
-  const photo = (p as any)?.photo;
+  const photo = p?.photo;
+  const photoPosition = (p as any)?.photoPosition ?? 'top-left';
+  const photoShape = (p as any)?.photoShape ?? 'circle';
+  const photoSize = (p as any)?.photoSize ?? 'medium';
+
+  const sizeClass = ({ small: 'w-10 h-10', medium: 'w-14 h-14', large: 'w-20 h-20' } as Record<string, string>)[photoSize] ?? 'w-14 h-14';
+  const radiusClass = ({ circle: 'rounded-full', rounded: 'rounded-lg', square: 'rounded-none' } as Record<string, string>)[photoShape] ?? 'rounded-full';
+  const headerClass = photoPosition === 'top-center'
+    ? 'flex flex-col items-center text-center gap-2'
+    : photoPosition === 'top-right'
+    ? 'flex flex-row-reverse items-start gap-3'
+    : 'flex items-start gap-3';
+
   return (
     <div className="text-[11px] text-[#1E293B] space-y-4">
       {/* Header */}
-      <div className="border-b-2 border-accent pb-3 flex items-start gap-3">
+      <div className={`border-b-2 border-accent pb-3 ${headerClass}`}>
         {photo && (
-          <img src={photo} alt="Photo" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+          <img src={photo} alt="Photo" className={`${sizeClass} ${radiusClass} object-cover shrink-0`} />
         )}
-        <div className="flex-1">
+        <div className={photoPosition === 'top-center' ? '' : 'flex-1'}>
         <h1 className="text-xl font-bold font-heading">
           {[p?.firstName, p?.lastName].filter(Boolean).join(' ') || 'Prénom Nom'}
         </h1>
