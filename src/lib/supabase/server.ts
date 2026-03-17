@@ -1,21 +1,38 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+let _supabaseAdmin: SupabaseClient | null = null;
+let _supabaseServer: SupabaseClient | null = null;
 
-/**
- * Server-side admin client — uses the service role key.
- * NEVER expose this to the browser. Use only in API routes / server actions.
- */
-export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
+export function getSupabaseAdmin(): SupabaseClient {
+  if (!_supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY manquants');
+    _supabaseAdmin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  }
+  return _supabaseAdmin;
+}
+
+export function getSupabaseServer(): SupabaseClient {
+  if (!_supabaseServer) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY manquants');
+    _supabaseServer = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  }
+  return _supabaseServer;
+}
+
+/** @deprecated use getSupabaseAdmin() */
+export const supabaseAdmin = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    return (getSupabaseAdmin() as unknown as Record<string | symbol, unknown>)[prop];
+  },
 });
 
-/**
- * Server-side anon client — for operations like signInWithPassword
- * that must go through Supabase RLS policies.
- */
-export const supabaseServer = createClient(supabaseUrl, anonKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
+/** @deprecated use getSupabaseServer() */
+export const supabaseServer = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    return (getSupabaseServer() as unknown as Record<string | symbol, unknown>)[prop];
+  },
 });
