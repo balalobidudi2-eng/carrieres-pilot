@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
 
 export const maxDuration = 15;
 
@@ -15,13 +14,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
   }
 
-  // Vérification de l'auth utilisateur
-  let userId: string;
-  try {
-    userId = requireAuth(req);
-  } catch {
+  // Vérification auth via cookie cp_refresh
+  const { cookies: reqCookies } = await import('next/headers');
+  const cookieStore = reqCookies();
+  const refreshToken = cookieStore.get('cp_refresh')?.value;
+  if (!refreshToken) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
   }
+  const { prisma } = await import('@/lib/prisma');
+  const tokenRecord = await prisma.refreshToken.findUnique({ where: { token: refreshToken } });
+  if (!tokenRecord || tokenRecord.expiresAt < new Date()) {
+    return NextResponse.json({ error: 'Session expirée' }, { status: 401 });
+  }
+  const userId = tokenRecord.userId;
 
   const body = await req.json() as { cookies?: unknown[] };
   const { cookies } = body;
