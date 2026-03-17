@@ -1,0 +1,57 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+
+export const maxDuration = 15;
+
+/**
+ * POST /api/external-accounts/save-cookies
+ * Reçoit les cookies Indeed depuis l'extension Chrome et les transmet
+ * au microservice Railway pour injection dans Playwright.
+ */
+export async function POST(req: NextRequest) {
+  // Vérification du secret extension
+  const extensionSecret = process.env.EXTENSION_SECRET;
+  if (!extensionSecret || req.headers.get('x-extension-secret') !== extensionSecret) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+  }
+
+  // Vérification de l'auth utilisateur
+  let userId: string;
+  try {
+    userId = requireAuth(req);
+  } catch {
+    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+  }
+
+  const body = await req.json() as { cookies?: unknown[] };
+  const { cookies } = body;
+
+  if (!Array.isArray(cookies) || cookies.length === 0) {
+    return NextResponse.json({ error: 'cookies manquants ou vides' }, { status: 400 });
+  }
+
+  const automationUrl = process.env.AUTOMATION_SERVICE_URL;
+  const automationSecret = process.env.AUTOMATION_SECRET;
+
+  if (!automationUrl || !automationSecret) {
+    return NextResponse.json({ error: 'Service d\'automatisation non configuré' }, { status: 503 });
+  }
+
+  const res = await fetch(`${automationUrl}/sessions/cookies`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-automation-secret': automationSecret,
+    },
+    body: JSON.stringify({ userId, cookies }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.status.toString());
+    console.error('[save-cookies] Automation error:', res.status, text);
+    return NextResponse.json({ error: 'Erreur transmission vers le service automation' }, { status: 502 });
+  }
+
+  console.log(`[save-cookies] Cookies Indeed stockés pour userId: ${userId} (${cookies.length} cookies)`);
+  return NextResponse.json({ success: true });
+}
