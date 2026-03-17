@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const maxDuration = 15;
 
 function corsHeaders(req: NextRequest) {
-  const origin = req.headers.get('origin') || '*';
+  const origin = req.headers.get('origin') ?? 'null';
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
