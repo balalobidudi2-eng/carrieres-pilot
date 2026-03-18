@@ -13,39 +13,39 @@ const features = [
   {
     icon: Target,
     title: 'Matching intelligent d\'offres',
-    description: 'Notre algorithme analyse votre profil, vos compÃ©tences et vos ambitions pour vous proposer uniquement les offres qui vous correspondent vraiment.',
+    description: 'Notre algorithme analyse votre profil, vos compétences et vos ambitions pour vous proposer uniquement les offres qui vous correspondent vraiment.',
     gradient: 'from-blue-500 to-cyan-400',
     tag: 'IA & Machine Learning',
   },
   {
     icon: Compass,
-    title: 'Copilote de carriÃ¨re',
-    description: 'Un tableau de bord complet pour piloter vos candidatures, vos entretiens et votre progression vers votre prochain poste â€” en temps rÃ©el.',
+    title: 'Copilote de carrière',
+    description: 'Un tableau de bord complet pour piloter vos candidatures, vos entretiens et votre progression vers votre prochain poste — en temps réel.',
     gradient: 'from-violet-500 to-purple-400',
     tag: 'Suivi & Analyse',
   },
   {
     icon: Shield,
     title: 'Outils premium exclusifs',
-    description: 'GÃ©nÃ©rateur de CV optimisÃ© ATS, lettres de motivation IA personnalisÃ©es, coaching d\'entretien et suivi automatisÃ© de vos candidatures.',
+    description: 'Générateur de CV optimisé ATS, lettres de motivation IA personnalisées, coaching d\'entretien et suivi automatisé de vos candidatures.',
     gradient: 'from-amber-500 to-orange-400',
-    tag: 'ProductivitÃ©',
+    tag: 'Productivité',
   },
 ];
 
 const discover = [
   { icon: Zap, title: 'Automatisation totale', desc: 'Postulez sur Indeed sans lever le petit doigt. Votre profil travaille pour vous.' },
-  { icon: FileText, title: 'CV & Lettres sur mesure', desc: 'GÃ©nÃ©rez des documents professionnels adaptÃ©s Ã  chaque offre en quelques secondes.' },
-  { icon: Calendar, title: 'Suivi des entretiens', desc: 'Rappels, notes, scores â€” tout votre pipeline de recrutement dans un seul endroit.' },
-  { icon: TrendingUp, title: 'Score de carriÃ¨re', desc: 'Un indicateur unique qui mesure votre progression et vous guide vers vos objectifs.' },
-  { icon: Users, title: 'RÃ©seau & opportunitÃ©s', desc: 'DÃ©couvrez des offres cachÃ©es grÃ¢ce Ã  notre rÃ©seau et nos partenariats exclusifs.' },
-  { icon: Star, title: 'AccÃ¨s prioritaire', desc: 'En tant que membre fondateur, vous dÃ©bloquez l\'accÃ¨s avant tout le monde.' },
+  { icon: FileText, title: 'CV & Lettres sur mesure', desc: 'Générez des documents professionnels adaptés à chaque offre en quelques secondes.' },
+  { icon: Calendar, title: 'Suivi des entretiens', desc: 'Rappels, notes, scores — tout votre pipeline de recrutement dans un seul endroit.' },
+  { icon: TrendingUp, title: 'Score de carrière', desc: 'Un indicateur unique qui mesure votre progression et vous guide vers vos objectifs.' },
+  { icon: Users, title: 'Réseau & opportunités', desc: 'Découvrez des offres cachées grâce à notre réseau et nos partenariats exclusifs.' },
+  { icon: Star, title: 'Accès prioritaire', desc: 'En tant que membre fondateur, vous débloquez l\'accès avant tout le monde.' },
 ];
 
 const timeline = [
-  { label: 'Lancement BÃªta', desc: 'Premier accÃ¨s pour les membres fondateurs', status: 'done' },
-  { label: 'Matching IA avancÃ©', desc: 'Algorithme de recommandation de nouvelle gÃ©nÃ©ration', status: 'current' },
-  { label: 'Ouverture publique', desc: 'CarriÃ¨rePilot accessible Ã  tous', status: 'upcoming' },
+  { label: 'Lancement Bêta', desc: 'Premier accès pour les membres fondateurs', status: 'done' },
+  { label: 'Matching IA avancé', desc: 'Algorithme de recommandation de nouvelle génération', status: 'current' },
+  { label: 'Ouverture publique', desc: 'CarrièrePilot accessible à tous', status: 'upcoming' },
 ];
 
 function pad(n: number) {
@@ -74,10 +74,11 @@ function useCountdown() {
   if (remaining === null) return null;
 
   const totalSec = Math.floor(remaining / 1000);
-  const h = Math.floor(totalSec / 3600);
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  return { h, m, s, expired: remaining === 0 };
+  return { d, h, m, s, expired: remaining === 0 };
 }
 
 function FadeIn({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
@@ -133,7 +134,7 @@ export default function ComingSoonPage() {
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-violet-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-500/20">
             <Plane size={15} className="text-white" />
           </div>
-          <span className="font-heading font-bold text-base tracking-tight text-gray-900">CarriÃ¨rePilot</span>
+          <span className="font-heading font-bold text-base tracking-tight text-gray-900">CarrièrePilot</span>
         </div>
         <button
           onClick={handleLogout}
@@ -141,7 +142,7 @@ export default function ComingSoonPage() {
           className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-red-500 bg-gray-50 hover:bg-red-50 border border-gray-200 hover:border-red-200 rounded-xl px-4 py-2 transition-all disabled:opacity-50"
         >
           <LogOut size={15} />
-          {loggingOut ? 'DÃ©connexionâ€¦' : 'Se dÃ©connecter'}
+          {loggingOut ? 'Déconnexion…' : 'Se déconnecter'}
         </button>
       </div>
 
@@ -159,7 +160,7 @@ export default function ComingSoonPage() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
           </span>
-          <span className="text-sm text-emerald-700 font-medium">AccÃ¨s anticipÃ© en cours</span>
+          <span className="text-sm text-emerald-700 font-medium">Accès anticipé en cours</span>
         </motion.div>
 
         {/* Title */}
@@ -170,11 +171,11 @@ export default function ComingSoonPage() {
           className="text-5xl sm:text-6xl md:text-7xl font-heading font-extrabold leading-[1.05] tracking-tight mb-6 max-w-4xl"
         >
           <span className="bg-gradient-to-br from-blue-600 via-violet-600 to-blue-700 bg-clip-text text-transparent">
-            CarriÃ¨re Pilote
+            Carrière Pilote
           </span>
           <br />
           <span className="text-2xl sm:text-3xl md:text-4xl font-semibold text-gray-400">
-            arrive bientÃ´t
+            arrive bientôt
           </span>
         </motion.h1>
 
@@ -186,10 +187,10 @@ export default function ComingSoonPage() {
           className="mb-10 max-w-2xl"
         >
           <p className="text-xl sm:text-2xl text-gray-700 font-medium mb-2">
-            Bienvenue{user?.firstName ? ` ${user.firstName}` : ''} ðŸ‘‹
+            Bienvenue{user?.firstName ? ` ${user.firstName}` : ''} 👋
           </p>
           <p className="text-gray-400 text-base sm:text-lg">
-            Votre inscription est confirmÃ©e. Vous faites partie des premiers Ã  rejoindre l&apos;aventure.
+            Votre inscription est confirmée. Vous faites partie des premiers à rejoindre l&apos;aventure.
           </p>
         </motion.div>
 
@@ -205,12 +206,13 @@ export default function ComingSoonPage() {
               <div className="flex items-center gap-2 text-blue-100 mb-3">
                 <Clock size={15} />
                 <span className="text-xs font-semibold uppercase tracking-widest">
-                  {countdown.expired ? 'AccÃ¨s en cours d\'activation' : 'AccÃ¨s anticipÃ©'}
+                  {countdown.expired ? 'Accès en cours d\'activation' : 'Accès anticipé'}
                 </span>
               </div>
               {!countdown.expired ? (
                 <div className="flex items-end gap-3">
                   {[
+                    { value: pad(countdown.d), label: 'j' },
                     { value: pad(countdown.h), label: 'h' },
                     { value: pad(countdown.m), label: 'min' },
                     { value: pad(countdown.s), label: 'sec' },
@@ -227,7 +229,7 @@ export default function ComingSoonPage() {
                   ))}
                 </div>
               ) : (
-                <span className="text-2xl font-bold text-white">ðŸŽ‰ C&apos;est l&apos;heure !</span>
+                <span className="text-2xl font-bold text-white">🎉 C&apos;est l&apos;heure !</span>
               )}
             </div>
           </motion.div>
@@ -247,7 +249,7 @@ export default function ComingSoonPage() {
             <div className="text-left">
               <p className="font-heading font-bold text-amber-700 text-sm mb-0.5">Cadeau de bienvenue</p>
               <p className="text-amber-600/80 text-sm">
-                <strong className="text-amber-700">7 jours Premium offerts</strong> dÃ¨s le lancement officiel
+                <strong className="text-amber-700">7 jours Premium offerts</strong> dès le lancement officiel
               </p>
             </div>
           </div>
@@ -260,7 +262,7 @@ export default function ComingSoonPage() {
           transition={{ delay: 1 }}
           className="flex flex-col items-center gap-2 text-gray-300"
         >
-          <span className="text-xs uppercase tracking-widest">DÃ©couvrir</span>
+          <span className="text-xs uppercase tracking-widest">Découvrir</span>
           <motion.div
             animate={{ y: [0, 6, 0] }}
             transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
@@ -274,12 +276,12 @@ export default function ComingSoonPage() {
       <section className="relative z-10 py-24 px-6 bg-gray-50/60">
         <div className="max-w-7xl mx-auto">
           <FadeIn className="text-center mb-16">
-            <p className="text-blue-600 font-semibold text-sm uppercase tracking-widest mb-4">FonctionnalitÃ©s</p>
+            <p className="text-blue-600 font-semibold text-sm uppercase tracking-widest mb-4">Fonctionnalités</p>
             <h2 className="text-4xl sm:text-5xl font-heading font-extrabold text-gray-900 mb-4">
               Ce qui vous attend
             </h2>
             <p className="text-gray-400 text-lg max-w-xl mx-auto">
-              Des outils pensÃ©s pour accÃ©lÃ©rer votre recherche d&apos;emploi
+              Des outils pensés pour accélérer votre recherche d&apos;emploi
             </p>
           </FadeIn>
 
@@ -314,10 +316,10 @@ export default function ComingSoonPage() {
           <FadeIn className="text-center mb-16">
             <p className="text-violet-600 font-semibold text-sm uppercase tracking-widest mb-4">Plateforme</p>
             <h2 className="text-4xl sm:text-5xl font-heading font-extrabold text-gray-900 mb-4">
-              Ce que vous allez dÃ©couvrir
+              Ce que vous allez découvrir
             </h2>
             <p className="text-gray-400 text-lg max-w-xl mx-auto">
-              Une suite complÃ¨te d&apos;outils pensÃ©s pour votre succÃ¨s
+              Une suite complète d&apos;outils pensés pour votre succès
             </p>
           </FadeIn>
 
@@ -347,7 +349,7 @@ export default function ComingSoonPage() {
             <h2 className="text-4xl sm:text-5xl font-heading font-extrabold text-gray-900 mb-4">
               Notre feuille de route
             </h2>
-            <p className="text-gray-400 text-lg">OÃ¹ on en est, et oÃ¹ on va.</p>
+            <p className="text-gray-400 text-lg">Où on en est, et où on va.</p>
           </FadeIn>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -386,7 +388,7 @@ export default function ComingSoonPage() {
                   )}
                   {step.status === 'done' && (
                     <span className="mt-4 text-xs font-semibold text-emerald-600 bg-emerald-100 border border-emerald-200 rounded-full px-3 py-1">
-                      TerminÃ© âœ“
+                      Terminé ✓
                     </span>
                   )}
                 </div>
@@ -406,10 +408,10 @@ export default function ComingSoonPage() {
                   <Bell size={26} className="text-white" />
                 </div>
                 <h2 className="font-heading font-extrabold text-3xl sm:text-4xl text-white mb-3">
-                  Soyez le premier informÃ©
+                  Soyez le premier informé
                 </h2>
                 <p className="text-blue-100/80 mb-8 text-lg">
-                  Recevez un email le jour du lancement et accÃ©dez en prioritÃ© absolue.
+                  Recevez un email le jour du lancement et accédez en priorité absolue.
                 </p>
                 <form onSubmit={handleNotify} className="flex flex-col sm:flex-row gap-3">
                   <input
@@ -434,9 +436,9 @@ export default function ComingSoonPage() {
                 animate={{ opacity: 1, scale: 1 }}
               >
                 <CheckCircle size={48} className="text-white mx-auto mb-4" />
-                <p className="font-heading font-bold text-2xl text-white mb-2">C&apos;est notÃ© !</p>
+                <p className="font-heading font-bold text-2xl text-white mb-2">C&apos;est noté !</p>
                 <p className="text-blue-100/70">
-                  Vous serez notifiÃ© Ã  <strong className="text-white">{email}</strong> dÃ¨s l&apos;ouverture.
+                  Vous serez notifié à <strong className="text-white">{email}</strong> dès l&apos;ouverture.
                 </p>
               </motion.div>
             )}
@@ -449,11 +451,11 @@ export default function ComingSoonPage() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-gray-400">
             <Plane size={14} />
-            <span className="text-xs">Â© {new Date().getFullYear()} CarriÃ¨rePilot Â· Tous droits rÃ©servÃ©s</span>
+            <span className="text-xs">© {new Date().getFullYear()} CarrièrePilot · Tous droits réservés</span>
           </div>
           <div className="flex gap-6">
             <Link href="/cgu" className="text-gray-400 text-xs hover:text-gray-600 transition-colors">CGU</Link>
-            <Link href="/confidentialite" className="text-gray-400 text-xs hover:text-gray-600 transition-colors">ConfidentialitÃ©</Link>
+            <Link href="/confidentialite" className="text-gray-400 text-xs hover:text-gray-600 transition-colors">Confidentialité</Link>
           </div>
         </div>
       </footer>
