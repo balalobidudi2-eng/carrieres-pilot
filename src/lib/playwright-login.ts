@@ -112,7 +112,8 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
     const selectors = SITE_SELECTORS[config.site] ?? SITE_SELECTORS.default;
 
     console.log(`[playwright-login] Navigating to ${config.loginUrl}`);
-    await page.goto(config.loginUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    // Use 'load' instead of 'domcontentloaded' so Angular/React SPAs have time to bootstrap
+    await page.goto(config.loginUrl, { waitUntil: 'load', timeout: 20000 });
 
     // Dismiss cookie banners
     for (const sel of COOKIE_BANNER_SELECTORS) {
@@ -124,9 +125,8 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
       }
     }
 
-    // Fill email
-    // Use waitForSelector so SPAs (Angular, React) have time to render the form
-    const emailField = await page.waitForSelector(selectors.emailSelector, { timeout: 12000 }).catch(() => null);
+    // Fill email — generous timeout for SPA rendering (Angular bootstrap can take 3-5 s)
+    const emailField = await page.waitForSelector(selectors.emailSelector, { timeout: 20000 }).catch(() => null);
     if (!emailField) {
       return { success: false, message: 'Champ email introuvable sur la page de connexion' };
     }
@@ -134,8 +134,19 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
     await emailField.fill(config.email);
     console.log('[playwright-login] Email filled');
 
-    // Fill password
-    const passwordField = await page.waitForSelector(selectors.passwordSelector, { timeout: 5000 }).catch(() => null);
+    // Multi-step form handling (e.g. CleverConnect / MétéoJob):
+    // If the password field is not immediately visible, submit the email step first,
+    // then wait for the password field to appear on the next screen.
+    let passwordField = await page.waitForSelector(selectors.passwordSelector, { timeout: 3000 }).catch(() => null);
+    if (!passwordField) {
+      // Email-only step — click the submit/next button to reveal the password screen
+      const nextBtn = await page.waitForSelector(selectors.submitSelector, { timeout: 5000 }).catch(() => null);
+      if (nextBtn) {
+        await nextBtn.click();
+        await page.waitForTimeout(2500);
+      }
+      passwordField = await page.waitForSelector(selectors.passwordSelector, { timeout: 15000 }).catch(() => null);
+    }
     if (!passwordField) {
       return { success: false, message: 'Champ mot de passe introuvable' };
     }
@@ -143,18 +154,15 @@ export async function testExternalLogin(config: LoginConfig): Promise<LoginResul
     await passwordField.fill(config.password);
     console.log('[playwright-login] Password filled');
 
-    // Submit
-    const submitBtn = await page.waitForSelector(selectors.submitSelector, { timeout: 5000 }).catch(() => null);
+    // Submit final step
+    const submitBtn = await page.waitForSelector(selectors.submitSelector, { timeout: 8000 }).catch(() => null);
     if (!submitBtn) {
       return { success: false, message: 'Bouton de connexion introuvable' };
     }
 
-    await Promise.all([
-      page.waitForNavigation({ timeout: 10000, waitUntil: 'domcontentloaded' }).catch(() => null),
-      submitBtn.click(),
-    ]);
-
-    await page.waitForTimeout(2000);
+    // SPAs don't always trigger a full navigation — just click and wait
+    await submitBtn.click();
+    await page.waitForTimeout(3000);
 
     // Check success indicators
     const successEl = await page.$(selectors.successIndicator).catch(() => null);

@@ -27,6 +27,16 @@ const nextConfig = {
     serverComponentsExternalPackages: ['pdf-parse', 'mammoth', 'playwright-core', '@sparticuz/chromium-min'],
     optimizePackageImports: ['lucide-react', 'recharts'],
   },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'xn--carrirepilot-feb.fr' }],
+        destination: 'https://xn--carrirepilot-1db.fr/:path*',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
