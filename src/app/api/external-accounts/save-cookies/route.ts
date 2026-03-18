@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Service d\'automatisation non configuré' }, { status: 503, headers: ch });
   }
 
-  const res = await fetch(`${automationUrl}/sessions/cookies`, {
+  const res = await fetch(`${automationUrl}/store-cookies`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
