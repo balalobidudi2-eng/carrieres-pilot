@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+ import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 15;
 
@@ -8,7 +8,7 @@ function corsHeaders(req: NextRequest) {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-extension-secret',
-    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Credentials': 'false',
   };
 }
 
