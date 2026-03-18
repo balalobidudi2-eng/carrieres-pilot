@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, signAccessToken, createRefreshToken, setRefreshCookie } from '@/lib/auth';
+import { setAdminLevelCookie } from '@/lib/admin-auth';
+import jwt from 'jsonwebtoken';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -113,8 +115,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Issue session tokens
-    const accessToken = signAccessToken(user.id);
+    // Issue session tokens (admin gets adminLevel in JWT)
+    const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-carrieres-pilot-fallback';
+    const accessToken = user.adminLevel
+      ? jwt.sign({ sub: user.id, adminLevel: user.adminLevel }, JWT_SECRET, { expiresIn: '15m' })
+      : signAccessToken(user.id);
     const refreshToken = await createRefreshToken(user.id);
 
     // Must await cookie setting (server action context)
@@ -123,8 +128,16 @@ export async function GET(req: NextRequest) {
     // Track last login
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
 
+    // Admin → full dashboard, Regular user → coming-soon (pre-launch mode)
+    const siteIsLive = process.env.SITE_IS_LIVE === 'true';
+    const destination = user.adminLevel
+      ? `${baseUrl}/admin/dashboard`
+      : siteIsLive
+        ? `${baseUrl}/dashboard`
+        : `${baseUrl}/coming-soon`;
+
     // Pass the access token via a short-lived cookie so the client-side can pick it up
-    const redirectResponse = NextResponse.redirect(`${baseUrl}/dashboard`);
+    const redirectResponse = NextResponse.redirect(destination);
     redirectResponse.cookies.set('cp_access_token', accessToken, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
@@ -132,6 +145,16 @@ export async function GET(req: NextRequest) {
       path: '/',
       maxAge: 60, // 1 minute — client reads it immediately and clears it
     });
+    // Set admin cookie if applicable
+    if (user.adminLevel) {
+      redirectResponse.cookies.set('cp_admin_level', String(user.adminLevel), {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24, // 24h
+      });
+    }
     // Clear the state cookie
     redirectResponse.cookies.set('google_oauth_state', '', { maxAge: 0, path: '/api/auth/google' });
 

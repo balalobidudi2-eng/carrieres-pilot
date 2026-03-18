@@ -8,12 +8,15 @@ const AUTH_ROUTES = ['/connexion', '/inscription'];
 const PUBLIC_ONLY_EXCEPTIONS = ['/verifier-email'];
 // Admin routes — require cp_admin_level cookie
 const ADMIN_PREFIX = '/admin';
+// Pre-launch: non-admin users can only access /coming-soon
+const COMING_SOON = '/coming-soon';
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const isLoggedIn = req.cookies.has('cp_logged');
   const adminLevel = req.cookies.get('cp_admin_level')?.value;
+  const siteIsLive = process.env.SITE_IS_LIVE === 'true';
 
   // ── Admin routes ──────────────────────────────────────────────────
   if (pathname === ADMIN_PREFIX || pathname.startsWith(ADMIN_PREFIX + '/')) {
@@ -24,6 +27,16 @@ export function middleware(req: NextRequest) {
       return NextResponse.redirect(url);
     }
     return NextResponse.next();
+  }
+
+  // ── Pre-launch gate: non-admin logged-in users → /coming-soon ────
+  if (!siteIsLive && isLoggedIn && !adminLevel) {
+    const isProtectedRoute = PROTECTED.some((r) => pathname === r || pathname.startsWith(r + '/'));
+    if (isProtectedRoute) {
+      const url = req.nextUrl.clone();
+      url.pathname = COMING_SOON;
+      return NextResponse.redirect(url);
+    }
   }
 
   // ── Protected app routes ──────────────────────────────────────────
@@ -37,7 +50,13 @@ export function middleware(req: NextRequest) {
   // ── Redirect to dashboard if already logged in on auth pages ──────
   if (AUTH_ROUTES.some((r) => pathname.startsWith(r)) && isLoggedIn && !PUBLIC_ONLY_EXCEPTIONS.some((r) => pathname.startsWith(r))) {
     const url = req.nextUrl.clone();
-    url.pathname = adminLevel ? '/admin/dashboard' : '/dashboard';
+    if (adminLevel) {
+      url.pathname = '/admin/dashboard';
+    } else if (!siteIsLive) {
+      url.pathname = COMING_SOON;
+    } else {
+      url.pathname = '/dashboard';
+    }
     return NextResponse.redirect(url);
   }
 

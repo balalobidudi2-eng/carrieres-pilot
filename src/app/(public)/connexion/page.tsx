@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, Zap, Sparkles } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Zap } from 'lucide-react';
 import { useState, Suspense } from 'react';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'next/navigation';
@@ -24,10 +24,9 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 function ConnexionContent() {
   const [showPassword, setShowPassword] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resendingVerif, setResendingVerif] = useState(false);
-  const { login, loginDemo, isLoading } = useAuthStore();
+  const { login, isLoading } = useAuthStore();
   const searchParams = useSearchParams();
   const justVerified = searchParams.get('verified') === '1';
   const tokenError = searchParams.get('error');
@@ -62,17 +61,6 @@ function ConnexionContent() {
       toast.error("Impossible d'envoyer l'email. Réessayez.");
     } finally {
       setResendingVerif(false);
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    setDemoLoading(true);
-    try {
-      await loginDemo();
-    } catch {
-      toast.error('Impossible de charger le compte démo');
-    } finally {
-      setDemoLoading(false);
     }
   };
 
@@ -140,17 +128,6 @@ function ConnexionContent() {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
             Continuer avec Google
-          </button>
-
-          {/* Demo account button */}
-          <button
-            type="button"
-            onClick={handleDemoLogin}
-            disabled={demoLoading || isLoading}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/30 rounded-btn px-4 py-3 text-sm font-semibold text-accent hover:from-accent/20 hover:to-primary/20 transition-all mb-3 disabled:opacity-60"
-          >
-            <Sparkles size={15} />
-            {demoLoading ? 'Connexion...' : 'Accès démo instantané — sans inscription'}
           </button>
 
           <div className="flex items-center gap-3 mb-5">

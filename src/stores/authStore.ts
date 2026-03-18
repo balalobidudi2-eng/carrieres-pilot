@@ -34,7 +34,12 @@ export const useAuthStore = create<AuthState>()(
       }
       const me = await api.get('/users/me');
       set({ user: me.data, isLoading: false });
-      window.location.href = me.data?.adminLevel ? '/admin/dashboard' : '/dashboard';
+      // Pre-launch: non-admin users go to /coming-soon
+      if (me.data?.adminLevel) {
+        window.location.href = '/admin/dashboard';
+      } else {
+        window.location.href = '/coming-soon';
+      }
     } catch (error) {
       set({ isLoading: false });
       throw error;
