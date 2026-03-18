@@ -307,3 +307,13 @@ model JobNotification {
   @@index([userId])
   @@map("job_notifications")
 }
+
+// ─── Indeed Cookies (extension Firefox → Railway) ─────────────────────────────
+
+model IndeedCookies {
+  userId    String   @id @map("user_id")
+  cookies   Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("indeed_cookies")
+}
